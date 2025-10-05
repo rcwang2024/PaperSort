@@ -1,0 +1,160 @@
+.mindmap-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.7);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  padding: 2rem;
+  animation: fadeIn 0.2s ease-in;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.mindmap-window {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+  max-width: 90vw;
+  max-height: 90vh;
+  width: 1200px;
+  height: 800px;
+  display: flex;
+  flex-direction: column;
+  animation: slideUp 0.3s ease-out;
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(30px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.mindmap-header {
+  padding: 1.5rem;
+  border-bottom: 2px solid var(--border-color);
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.mindmap-title {
+  flex: 1;
+}
+
+.mindmap-title h2 {
+  color: var(--text-color);
+  font-size: 1.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.paper-authors {
+  color: var(--text-light);
+  font-size: 0.9rem;
+}
+
+.mindmap-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.btn-export {
+  background-color: var(--secondary-color);
+  color: white;
+}
+
+.btn-export:hover {
+  background-color: #45a049;
+}
+
+.btn-close {
+  background-color: var(--danger-color);
+  color: white;
+  padding: 0.75rem 1rem;
+  min-width: auto;
+}
+
+.btn-close:hover {
+  background-color: #d32f2f;
+}
+
+.mindmap-summary {
+  padding: 1.5rem;
+  background-color: #f0f7ff;
+  border-bottom: 2px solid var(--border-color);
+  max-height: 250px;
+  overflow-y: auto;
+}
+
+.mindmap-summary h3 {
+  margin-top: 0;
+  margin-bottom: 1rem;
+  color: var(--primary-color);
+  font-size: 1.1rem;
+}
+
+.summary-content {
+  font-size: 0.9rem;
+  line-height: 1.6;
+  color: var(--text-color);
+}
+
+.summary-content p {
+  margin: 0.5rem 0;
+  white-space: pre-wrap;
+}
+
+.summary-content p:empty {
+  display: none;
+}
+
+.mindmap-content {
+  flex: 1;
+  overflow: auto;
+  padding: 2rem;
+  background-color: #fafafa;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.mindmap-content svg {
+  max-width: 100%;
+  height: auto;
+  filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.1));
+}
+
+.loading {
+  color: var(--text-light);
+  font-size: 1.2rem;
+}
+
+.mindmap-footer {
+  padding: 1rem 1.5rem;
+  border-top: 1px solid var(--border-color);
+  background-color: var(--bg-light);
+  text-align: center;
+}
+
+.help-text {
+  color: var(--text-light);
+  font-size: 0.85rem;
+  margin: 0;
+}

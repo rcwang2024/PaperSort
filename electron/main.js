@@ -1,0 +1,401 @@
+const { app, BrowserWindow, dialog, Menu, ipcMain } = require('electron');
+const path = require('path');
+const { spawn } = require('child_process');
+const isDev = require('electron-is-dev');
+const http = require('http');
+const DependencyChecker = require('./dependency-checker');
+
+let mainWindow;
+let backendProcess = null;
+let frontendProcess = null;
+
+// Check if backend is running
+function checkBackend(retries = 30) {
+  return new Promise((resolve) => {
+    const checkServer = (attempt) => {
+      const req = http.get('http://127.0.0.1:8000/health', (res) => {
+        if (res.statusCode === 200) {
+          console.log('Backend is ready');
+          resolve(true);
+        } else if (attempt < retries) {
+          setTimeout(() => checkServer(attempt + 1), 1000);
+        } else {
+          resolve(false);
+        }
+      });
+
+      req.on('error', () => {
+        if (attempt < retries) {
+          setTimeout(() => checkServer(attempt + 1), 1000);
+        } else {
+          resolve(false);
+        }
+      });
+
+      req.setTimeout(2000, () => {
+        req.destroy();
+        if (attempt < retries) {
+          setTimeout(() => checkServer(attempt + 1), 1000);
+        } else {
+          resolve(false);
+        }
+      });
+    };
+
+    checkServer(0);
+  });
+}
+
+// Check if Ollama is running
+async function checkOllama() {
+  return new Promise((resolve) => {
+    const req = http.get('http://127.0.0.1:11434/api/version', (res) => {
+      resolve(res.statusCode === 200);
+    });
+
+    req.on('error', () => resolve(false));
+    req.setTimeout(2000, () => {
+      req.destroy();
+      resolve(false);
+    });
+  });
+}
+
+// Start Python backend
+async function startBackend() {
+  const fs = require('fs');
+  const backendPath = isDev
+    ? path.join(__dirname, '..', 'backend')
+    : path.join(process.resourcesPath, 'backend');
+
+  console.log('Starting backend from:', backendPath);
+  console.log('Is development mode:', isDev);
+  console.log('Resources path:', process.resourcesPath);
+
+  // Check for bundled executable first (for production)
+  const bundledExe = path.join(backendPath, 'dist', 'papersort-backend');
+
+  if (!isDev && fs.existsSync(bundledExe)) {
+    // Use bundled executable in production
+    console.log('Using bundled backend executable:', bundledExe);
+
+    backendProcess = spawn(bundledExe, [], {
+      stdio: 'pipe',
+      env: { ...process.env }
+    });
+  } else {
+    // Fall back to Python script (development mode or if bundled exe not found)
+    const launcherScript = path.join(backendPath, 'run_backend.sh');
+    console.log('Using launcher script:', launcherScript);
+
+    // Check if the script exists
+    if (!fs.existsSync(launcherScript)) {
+      console.error('Backend launcher script not found at:', launcherScript);
+      dialog.showErrorBox(
+        'Backend Error',
+        `Backend launcher script not found at:\n${launcherScript}\n\nBackend path: ${backendPath}`
+      );
+      return false;
+    }
+
+    console.log('Backend script exists, starting...');
+
+    backendProcess = spawn('bash', [launcherScript], {
+      cwd: backendPath,
+      stdio: 'pipe',
+      env: { ...process.env }
+    });
+  }
+
+  let backendOutput = '';
+  let backendErrors = '';
+
+  backendProcess.stdout.on('data', (data) => {
+    const output = data.toString();
+    backendOutput += output;
+    console.log(`Backend: ${output}`);
+  });
+
+  backendProcess.stderr.on('data', (data) => {
+    const error = data.toString();
+    backendErrors += error;
+    console.error(`Backend Error: ${error}`);
+  });
+
+  backendProcess.on('close', (code) => {
+    console.log(`Backend process exited with code ${code}`);
+    if (code !== 0 && code !== null) {
+      const errorMsg = backendErrors || backendOutput || 'Unknown error';
+      dialog.showErrorBox(
+        'Backend Error',
+        `The backend server failed to start (exit code: ${code}).\n\nError output:\n${errorMsg.substring(0, 500)}`
+      );
+    }
+  });
+
+  // Wait for backend to be ready (first launch with package install may take longer)
+  console.log('Waiting for backend to be ready...');
+  const isReady = await checkBackend(120); // 120 retries = 2 minutes max
+
+  if (!isReady) {
+    const errorDetails = backendErrors || backendOutput || 'No output captured';
+    console.error('Backend failed to start. Output:', errorDetails);
+
+    dialog.showErrorBox(
+      'Backend Failed',
+      `Could not connect to the backend server.\n\nBackend path: ${backendPath}\n\nOutput:\n${errorDetails.substring(0, 400)}\n\nPlease ensure:\n1. Python 3.8+ is installed\n2. Run: pip install -r requirements.txt`
+    );
+  } else {
+    console.log('Backend started successfully!');
+  }
+
+  return isReady;
+}
+
+// Start frontend dev server (only in development)
+async function startFrontend() {
+  if (!isDev) return; // In production, we use built files
+
+  const frontendPath = path.join(__dirname, '..', 'frontend');
+
+  console.log('Starting frontend dev server from:', frontendPath);
+
+  frontendProcess = spawn('npm', ['run', 'dev'], {
+    cwd: frontendPath,
+    stdio: 'pipe',
+    shell: true
+  });
+
+  frontendProcess.stdout.on('data', (data) => {
+    console.log(`Frontend: ${data}`);
+  });
+
+  frontendProcess.stderr.on('data', (data) => {
+    console.error(`Frontend: ${data}`);
+  });
+
+  frontendProcess.on('close', (code) => {
+    console.log(`Frontend process exited with code ${code}`);
+  });
+
+  // Wait a bit for Vite to start
+  await new Promise(resolve => setTimeout(resolve, 3000));
+}
+
+// Create main window
+async function createWindow() {
+  // Check dependencies first (Python, pip, packages, Graphviz, etc.)
+  const checker = new DependencyChecker();
+  const checkResult = await checker.checkAll();
+
+  if (!checkResult.allRequired) {
+    // Show installation dialog
+    const installResult = await checker.showInstallDialog(null);
+
+    if (installResult.action === 'quit') {
+      app.quit();
+      return;
+    } else if (installResult.action === 'restart') {
+      app.relaunch();
+      app.quit();
+      return;
+    }
+    // If 'continue', proceed anyway (though some features may not work)
+  }
+
+  // Check Ollama availability (optional, but recommended)
+  if (!checkResult.results.ollama) {
+    const response = await dialog.showMessageBox({
+      type: 'info',
+      title: 'Ollama Not Detected',
+      message: 'Enable AI-powered features?',
+      detail: 'Ollama provides advanced AI features:\n• Intelligent paper summaries\n• Analytical mind-maps\n• Better topic classification\n\nWithout Ollama, basic features will still work.\n\nInstall later: brew install ollama',
+      buttons: ['Continue Without AI', 'Install Ollama', 'Quit'],
+      defaultId: 0,
+      cancelId: 2
+    });
+
+    if (response.response === 1) {
+      // User wants to install Ollama
+      require('child_process').exec('open -a Terminal.app');
+      dialog.showMessageBox({
+        type: 'info',
+        message: 'Install Ollama',
+        detail: 'Run these commands in Terminal:\n\nbrew install ollama\nollama pull llama3.2:3b\n\nThen restart PaperSort.',
+        buttons: ['OK']
+      });
+      app.quit();
+      return;
+    } else if (response.response === 2) {
+      app.quit();
+      return;
+    }
+  }
+
+  // Start backend
+  console.log('Starting backend...');
+  await startBackend();
+
+  // In development, start frontend dev server
+  if (isDev) {
+    console.log('Starting frontend dev server...');
+    await startFrontend();
+  }
+
+  // Create the browser window
+  mainWindow = new BrowserWindow({
+    width: 1400,
+    height: 900,
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      nodeIntegration: false,
+      contextIsolation: true
+    },
+    title: 'PaperSort',
+    titleBarStyle: 'default'
+  });
+
+  // Load the app
+  let startUrl;
+  if (isDev) {
+    startUrl = 'http://localhost:1420'; // Vite dev server
+  } else {
+    // In production, frontend is packaged in app.asar or extraResources
+    // Try multiple possible paths
+    const possiblePaths = [
+      path.join(__dirname, '..', 'frontend', 'dist', 'index.html'),
+      path.join(process.resourcesPath, 'app.asar', 'frontend', 'dist', 'index.html'),
+      path.join(process.resourcesPath, 'frontend', 'dist', 'index.html'),
+    ];
+
+    let frontendPath = null;
+    for (const p of possiblePaths) {
+      console.log('Checking frontend path:', p);
+      if (require('fs').existsSync(p)) {
+        frontendPath = p;
+        console.log('✓ Found frontend at:', p);
+        break;
+      }
+    }
+
+    if (!frontendPath) {
+      console.error('ERROR: Could not find frontend files!');
+      console.error('Checked paths:', possiblePaths);
+      dialog.showErrorBox(
+        'Frontend Not Found',
+        'Could not locate the frontend files.\n\nPaths checked:\n' + possiblePaths.join('\n')
+      );
+      frontendPath = possiblePaths[0]; // Use first path anyway
+    }
+
+    startUrl = `file://${frontendPath}`;
+  }
+
+  console.log('Loading URL:', startUrl);
+  mainWindow.loadURL(startUrl);
+
+  // Open DevTools only in development
+  if (isDev) {
+    mainWindow.webContents.openDevTools();
+  }
+
+  // Create menu
+  const template = [
+    {
+      label: 'File',
+      submenu: [
+        {
+          label: 'Reload',
+          accelerator: 'CmdOrCtrl+R',
+          click: () => mainWindow.reload()
+        },
+        { type: 'separator' },
+        { role: 'quit' }
+      ]
+    },
+    {
+      label: 'Edit',
+      submenu: [
+        { role: 'undo' },
+        { role: 'redo' },
+        { type: 'separator' },
+        { role: 'cut' },
+        { role: 'copy' },
+        { role: 'paste' }
+      ]
+    },
+    {
+      label: 'View',
+      submenu: [
+        { role: 'toggleDevTools' },
+        { type: 'separator' },
+        { role: 'resetZoom' },
+        { role: 'zoomIn' },
+        { role: 'zoomOut' }
+      ]
+    },
+    {
+      label: 'Help',
+      submenu: [
+        {
+          label: 'About PaperSort',
+          click: async () => {
+            await dialog.showMessageBox({
+              type: 'info',
+              title: 'About PaperSort',
+              message: 'PaperSort v2.0.0',
+              detail: 'AI-powered academic paper organizer with mind-maps\n\nPowered by Ollama'
+            });
+          }
+        }
+      ]
+    }
+  ];
+
+  const menu = Menu.buildFromTemplate(template);
+  Menu.setApplicationMenu(menu);
+
+  mainWindow.on('closed', () => {
+    mainWindow = null;
+  });
+}
+
+// Clean up processes on quit
+app.on('will-quit', () => {
+  if (backendProcess) {
+    console.log('Stopping backend...');
+    backendProcess.kill();
+  }
+  if (frontendProcess) {
+    console.log('Stopping frontend...');
+    frontendProcess.kill();
+  }
+});
+
+app.on('window-all-closed', () => {
+  if (process.platform !== 'darwin') {
+    app.quit();
+  }
+});
+
+app.on('activate', () => {
+  if (mainWindow === null) {
+    createWindow();
+  }
+});
+
+// IPC handlers
+ipcMain.handle('dialog:openFolder', async () => {
+  const result = await dialog.showOpenDialog(mainWindow, {
+    properties: ['openDirectory']
+  });
+
+  if (result.canceled) {
+    return null;
+  }
+
+  return result.filePaths[0];
+});
+
+// Start the app
+app.whenReady().then(createWindow);

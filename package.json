@@ -1,0 +1,95 @@
+{
+  "name": "papersort",
+  "version": "2.0.0",
+  "description": "AI-powered academic paper organizer with mind-maps",
+  "main": "electron/main.js",
+  "scripts": {
+    "electron": "electron .",
+    "electron:dev": "electron . --dev",
+    "build:backend": "bash build-backend.sh",
+    "build:frontend": "cd frontend && npm run build",
+    "build:electron": "electron-builder",
+    "build": "npm run build:backend && npm run build:frontend && npm run build:electron",
+    "build:no-backend": "npm run build:frontend && npm run build:electron",
+    "postinstall": "cd frontend && npm install"
+  },
+  "keywords": [
+    "papers",
+    "research",
+    "organization",
+    "mind-map",
+    "ai",
+    "ollama"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^28.0.0",
+    "electron-builder": "^24.9.1"
+  },
+  "dependencies": {
+    "electron-is-dev": "^2.0.0"
+  },
+  "build": {
+    "appId": "com.papersort.app",
+    "productName": "PaperSort",
+    "directories": {
+      "output": "dist-installer"
+    },
+    "mac": {
+      "icon": "electron/icon.png",
+      "category": "public.app-category.productivity",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64"
+          ]
+        }
+      ]
+    },
+    "dmg": {
+      "title": "PaperSort ${version}",
+      "contents": [
+        {
+          "x": 130,
+          "y": 220
+        },
+        {
+          "x": 410,
+          "y": 220,
+          "type": "link",
+          "path": "/Applications"
+        }
+      ]
+    },
+    "files": [
+      "electron/**/*",
+      "!backend/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "frontend/dist",
+        "to": "frontend/dist",
+        "filter": ["**/*"]
+      },
+      {
+        "from": "backend/dist",
+        "to": "backend/dist",
+        "filter": ["papersort-backend"]
+      },
+      {
+        "from": "backend",
+        "to": "backend",
+        "filter": [
+          "run_backend.sh",
+          "requirements.txt",
+          "app/**/*",
+          "!**/__pycache__/**/*",
+          "!**/*.pyc",
+          "!.DS_Store"
+        ]
+      }
+    ]
+  }
+}
