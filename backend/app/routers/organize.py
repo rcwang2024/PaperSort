@@ -25,6 +25,20 @@ class OrganizeFolderRequest(BaseModel):
     copy_mode: bool = True  # True = copy, False = move
     enhance_metadata: bool = False  # Skip API calls for speed
 
+    def model_post_init(self, __context):
+        """Validate topic limits"""
+        MAX_TOPICS = 15
+
+        # Limit num_topics to maximum
+        if self.num_topics is not None and self.num_topics > MAX_TOPICS:
+            logger.warning(f"num_topics={self.num_topics} exceeds maximum of {MAX_TOPICS}, limiting to {MAX_TOPICS}")
+            self.num_topics = MAX_TOPICS
+
+        # Limit custom_topics length
+        if self.custom_topics is not None and len(self.custom_topics) > MAX_TOPICS:
+            logger.warning(f"custom_topics count={len(self.custom_topics)} exceeds maximum of {MAX_TOPICS}, truncating")
+            self.custom_topics = self.custom_topics[:MAX_TOPICS]
+
 
 class OrganizeFolderResponse(BaseModel):
     """Response from folder organization"""

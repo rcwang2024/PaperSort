@@ -134,21 +134,25 @@ export default function FolderSelector({
 
           <div className="option">
             <label>
-              Number of topics (leave empty for auto-detect):
+              Number of topics (leave empty for auto-detect, max 15):
               <input
                 type="number"
                 min="2"
-                max="20"
+                max="15"
                 value={numTopics || ''}
-                onChange={(e) => setNumTopics(e.target.value ? parseInt(e.target.value) : undefined)}
-                placeholder="Auto"
+                onChange={(e) => {
+                  const val = e.target.value ? parseInt(e.target.value) : undefined;
+                  // Enforce max of 15
+                  setNumTopics(val && val > 15 ? 15 : val);
+                }}
+                placeholder="Auto (max 15)"
               />
             </label>
           </div>
 
           <div className="option">
             <label>
-              Custom topics (comma-separated, optional):
+              Custom topics (comma-separated, max 15):
               <input
                 type="text"
                 value={customTopics}
@@ -156,6 +160,9 @@ export default function FolderSelector({
                 placeholder="e.g., Machine Learning, Computer Vision"
               />
             </label>
+            <small style={{ color: '#666', fontSize: '0.85em' }}>
+              Note: Maximum 15 topics to keep folders organized
+            </small>
           </div>
         </div>
 
@@ -175,7 +182,7 @@ export default function FolderSelector({
 
         <div className="help-text">
           <p>Papers will be renamed to: <code>[Year] Title - Author.pdf</code></p>
-          <p>Organized into topic-based subfolders</p>
+          <p>Organized into topic-based subfolders (max 15 topics)</p>
         </div>
       </div>
     </div>

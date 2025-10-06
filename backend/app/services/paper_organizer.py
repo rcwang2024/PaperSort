@@ -338,6 +338,12 @@ class PaperOrganizer:
         from collections import Counter
         import re
 
+        # Enforce maximum of 15 topics to avoid folder clutter
+        MAX_TOPICS = 15
+        if num_topics is None or num_topics > MAX_TOPICS:
+            num_topics = MAX_TOPICS
+            logger.info(f"Limiting to maximum of {MAX_TOPICS} topics to avoid folder clutter")
+
         # Extract meaningful phrases from titles and abstracts
         topic_keywords = {}
         paper_topics = {}

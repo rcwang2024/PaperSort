@@ -11,7 +11,17 @@
     "build:electron": "electron-builder",
     "build": "npm run build:backend && npm run build:frontend && npm run build:electron",
     "build:no-backend": "npm run build:frontend && npm run build:electron",
-    "postinstall": "cd frontend && npm install"
+    "postinstall": "cd frontend && npm install",
+    "test": "npm run test:backend && npm run test:frontend",
+    "test:backend": "cd backend && . venv/bin/activate && pytest",
+    "test:backend:unit": "cd backend && . venv/bin/activate && pytest tests/unit -v",
+    "test:backend:integration": "cd backend && . venv/bin/activate && pytest tests/integration -v",
+    "test:backend:coverage": "cd backend && . venv/bin/activate && pytest --cov=app --cov-report=html",
+    "test:frontend": "cd frontend && npm test",
+    "test:frontend:ui": "cd frontend && npm run test:ui",
+    "test:frontend:coverage": "cd frontend && npm run test:coverage",
+    "test:e2e": "cd frontend && npm run test:e2e",
+    "test:all": "npm run test:backend && npm run test:frontend && npm run test:e2e"
   },
   "keywords": [
     "papers",
