@@ -333,105 +333,262 @@ class PaperOrganizer:
         papers_metadata: List[Dict],
         num_topics: Optional[int]
     ) -> Dict[str, List[int]]:
-        """Auto-detect specific topics from paper titles and abstracts using keyword extraction"""
+        """
+        Auto-detect topics using ML-based clustering with TF-IDF and K-Means
 
+        This provides much better results than simple keyword matching,
+        especially for large datasets (100+ papers)
+        """
+        from sklearn.feature_extraction.text import TfidfVectorizer
+        from sklearn.cluster import KMeans
         from collections import Counter
         import re
+        import numpy as np
 
         # Enforce maximum of 15 topics to avoid folder clutter
         MAX_TOPICS = 15
-        if num_topics is None or num_topics > MAX_TOPICS:
-            num_topics = MAX_TOPICS
-            logger.info(f"Limiting to maximum of {MAX_TOPICS} topics to avoid folder clutter")
+        MIN_TOPICS = 3
 
-        # Extract meaningful phrases from titles and abstracts
-        topic_keywords = {}
-        paper_topics = {}
+        # Determine optimal number of clusters
+        n_papers = len(papers_metadata)
 
-        for i, paper in enumerate(papers_metadata):
-            # Combine title, abstract, and keywords
-            text = ' '.join([
-                paper.get('title', ''),
+        if num_topics is None:
+            # Auto-determine based on dataset size
+            # Rule: ~50-100 papers per topic is manageable
+            if n_papers < 50:
+                num_topics = MIN_TOPICS
+            elif n_papers < 200:
+                num_topics = min(5, MAX_TOPICS)
+            elif n_papers < 500:
+                num_topics = min(8, MAX_TOPICS)
+            else:
+                # For large datasets (500+), use more topics but cap at 15
+                num_topics = min(int(n_papers / 80), MAX_TOPICS)
+
+            logger.info(f"Auto-determined {num_topics} topics for {n_papers} papers")
+        else:
+            num_topics = max(MIN_TOPICS, min(num_topics, MAX_TOPICS))
+            logger.info(f"Using {num_topics} topics (capped between {MIN_TOPICS}-{MAX_TOPICS})")
+
+        # Prepare documents for clustering
+        documents = []
+        for paper in papers_metadata:
+            # Combine title (weighted 2x), abstract, and keywords
+            doc = ' '.join([
+                paper.get('title', '') + ' ' + paper.get('title', ''),  # Title appears twice
                 paper.get('abstract', ''),
                 ' '.join(paper.get('keywords', []))
-            ]).lower()
+            ])
+            documents.append(doc)
 
-            # Extract key phrases (2-4 word combinations that appear in title or keywords)
-            title_lower = paper.get('title', '').lower()
-            abstract_lower = paper.get('abstract', '').lower()
-
-            # Common research topics from medical/biology/CS domains
-            domain_topics = {
-                'diabetes': ['diabetes', 'diabetic', 'glucose', 'insulin'],
-                'metabolomics': ['metabolom', 'metabolite', 'metabo'],
-                'cancer': ['cancer', 'tumor', 'oncology', 'carcinoma'],
-                'machine_learning': ['machine learning', 'deep learning', 'neural network'],
-                'genomics': ['genom', 'gene expression', 'rna-seq', 'dna'],
-                'multi_omics': ['multi-omic', 'multiomics', 'omics integration'],
-                'biomarker': ['biomarker', 'diagnostic marker'],
-                'type_2_diabetes': ['type 2 diabetes', 't2d', 'type ii diabetes'],
-                'cardiovascular': ['cardiovascular', 'heart disease', 'cardiac'],
-                'statistics': ['statistical', 'meta-analysis', 'regression'],
-                'data_visualization': ['visualization', 'network', 'graph'],
-            }
-
-            # Find matching topics
-            matched_topics = []
-            for topic_name, keywords in domain_topics.items():
-                for keyword in keywords:
-                    if keyword in text:
-                        matched_topics.append(topic_name)
-                        break
-
-            # If specific topics found, use the most relevant one
-            if matched_topics:
-                # Prefer more specific topics
-                topic = matched_topics[0]
-                # Make it human-readable
-                topic_display = topic.replace('_', ' ').title()
-            else:
-                # Fallback: extract from keywords or title
-                keywords = paper.get('keywords', [])
-                if keywords and len(keywords) > 0:
-                    # Use first meaningful keyword
-                    topic_display = keywords[0].strip()
-                else:
-                    # Extract from title - find meaningful noun phrases
-                    title_words = re.findall(r'\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\b', paper.get('title', ''))
-                    if title_words:
-                        topic_display = title_words[0]
-                    else:
-                        topic_display = 'General'
-
-            # Group papers by topic
-            if topic_display not in topic_keywords:
-                topic_keywords[topic_display] = []
-            topic_keywords[topic_display].append(i)
-            paper_topics[i] = topic_display
-
-        # If we have num_topics specified, consolidate to that number
-        if num_topics and len(topic_keywords) > num_topics:
-            # Keep the largest groups
-            sorted_topics = sorted(
-                topic_keywords.items(),
-                key=lambda x: len(x[1]),
-                reverse=True
+        try:
+            # Use TF-IDF to vectorize documents
+            # This captures term importance better than simple word counting
+            vectorizer = TfidfVectorizer(
+                max_features=1000,  # Limit to top 1000 terms
+                min_df=2,  # Term must appear in at least 2 documents
+                max_df=0.8,  # Ignore terms in >80% of documents (too common)
+                stop_words='english',  # Remove "this", "that", "and", etc.
+                ngram_range=(1, 3),  # Capture 1-3 word phrases
+                strip_accents='unicode',
+                lowercase=True
             )
 
-            # Keep top N topics
-            kept_topics = dict(sorted_topics[:num_topics])
+            tfidf_matrix = vectorizer.fit_transform(documents)
+            logger.info(f"TF-IDF matrix shape: {tfidf_matrix.shape}")
 
-            # Merge remaining into "Other"
-            other_papers = []
-            for topic, papers in sorted_topics[num_topics:]:
-                other_papers.extend(papers)
+            # Use K-Means clustering
+            kmeans = KMeans(
+                n_clusters=num_topics,
+                random_state=42,
+                n_init=10,
+                max_iter=300
+            )
+            cluster_labels = kmeans.fit_predict(tfidf_matrix)
 
-            if other_papers:
-                kept_topics['Other'] = other_papers
+            # Extract meaningful topic names from cluster centroids
+            feature_names = vectorizer.get_feature_names_out()
+            topic_names = {}
 
-            return kept_topics
+            for cluster_id in range(num_topics):
+                # Get top terms for this cluster
+                centroid = kmeans.cluster_centers_[cluster_id]
+                top_indices = centroid.argsort()[-5:][::-1]  # Top 5 terms
+                top_terms = [feature_names[i] for i in top_indices]
 
-        return topic_keywords
+                # Generate readable topic name from top terms
+                topic_name = self._generate_topic_name(top_terms, cluster_id, papers_metadata, cluster_labels)
+                topic_names[cluster_id] = topic_name
+
+            # Group papers by cluster
+            topics_dict = {}
+            for cluster_id, topic_name in topic_names.items():
+                paper_indices = [i for i, label in enumerate(cluster_labels) if label == cluster_id]
+
+                # Only include topics with at least 2 papers
+                if len(paper_indices) >= 2:
+                    topics_dict[topic_name] = paper_indices
+                else:
+                    # Single-paper "topics" go to "Other"
+                    if 'Other' not in topics_dict:
+                        topics_dict['Other'] = []
+                    topics_dict['Other'].extend(paper_indices)
+
+            logger.info(f"Created {len(topics_dict)} topics: {list(topics_dict.keys())}")
+
+            # Optional: Use Ollama to refine topic names if available
+            if self.ollama_available:
+                topics_dict = await self._refine_topic_names_with_llm(topics_dict, papers_metadata)
+
+            return topics_dict
+
+        except Exception as e:
+            logger.error(f"Clustering failed: {e}, falling back to simple grouping")
+            # Fallback: group all papers into "General"
+            return {"General": list(range(len(papers_metadata)))}
+
+    def _generate_topic_name(
+        self,
+        top_terms: List[str],
+        cluster_id: int,
+        papers_metadata: List[Dict],
+        cluster_labels: np.ndarray
+    ) -> str:
+        """
+        Generate a meaningful topic name from top TF-IDF terms
+
+        Priority:
+        1. Use multi-word phrases if available
+        2. Combine related single words
+        3. Capitalize properly
+        4. Fallback to generic name if terms are too vague
+        """
+        import re
+
+        # Filter out vague/generic terms
+        stopwords = {
+            'using', 'based', 'study', 'analysis', 'approach', 'method',
+            'results', 'new', 'novel', 'paper', 'research', 'data',
+            'model', 'models', 'system', 'systems', 'application'
+        }
+
+        filtered_terms = [t for t in top_terms if t.lower() not in stopwords and len(t) > 2]
+
+        if not filtered_terms:
+            # If all terms are generic, look at paper titles in this cluster
+            cluster_papers = [papers_metadata[i] for i, label in enumerate(cluster_labels) if label == cluster_id]
+
+            # Extract common meaningful words from titles
+            title_words = []
+            for paper in cluster_papers[:10]:  # Sample first 10 papers
+                title = paper.get('title', '')
+                # Extract capitalized words (likely domain-specific terms)
+                words = re.findall(r'\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,2}\b', title)
+                title_words.extend(words)
+
+            if title_words:
+                # Use most common title word
+                word_counts = Counter(title_words)
+                most_common = word_counts.most_common(1)[0][0]
+                return most_common
+            else:
+                # Last resort: generic topic name
+                return f"Topic {cluster_id + 1}"
+
+        # Prefer multi-word phrases (they're more specific)
+        phrases = [t for t in filtered_terms if ' ' in t]
+        if phrases:
+            # Use the best phrase, capitalize properly
+            best_phrase = phrases[0]
+            return ' '.join(word.capitalize() for word in best_phrase.split())
+
+        # Combine top 2-3 single words into a descriptive name
+        if len(filtered_terms) >= 2:
+            # Take top 2-3 terms and create compound name
+            combined = ' '.join(filtered_terms[:2])
+            return ' '.join(word.capitalize() for word in combined.split())
+        elif filtered_terms:
+            # Single term
+            return filtered_terms[0].capitalize()
+        else:
+            return f"Topic {cluster_id + 1}"
+
+    async def _refine_topic_names_with_llm(
+        self,
+        topics_dict: Dict[str, List[int]],
+        papers_metadata: List[Dict]
+    ) -> Dict[str, List[int]]:
+        """
+        Use Ollama LLM to generate better topic names based on paper titles
+
+        This is optional but provides more accurate, domain-specific topic names
+        """
+        logger.info("Refining topic names with LLM...")
+
+        refined_dict = {}
+
+        for topic_name, paper_indices in topics_dict.items():
+            # Skip "Other" category
+            if topic_name == "Other":
+                refined_dict[topic_name] = paper_indices
+                continue
+
+            # Sample up to 10 paper titles from this cluster
+            sample_titles = []
+            for idx in paper_indices[:10]:
+                title = papers_metadata[idx].get('title', '')
+                if title:
+                    sample_titles.append(title)
+
+            if not sample_titles:
+                refined_dict[topic_name] = paper_indices
+                continue
+
+            try:
+                # Ask LLM to generate a concise topic name
+                prompt = f"""Based on these paper titles from an academic cluster, suggest ONE concise topic name (2-4 words max) that captures the research theme:
+
+{chr(10).join(f"- {t}" for t in sample_titles[:8])}
+
+Respond with ONLY the topic name, nothing else. Make it specific and academic."""
+
+                async with httpx.AsyncClient(timeout=10.0) as client:
+                    response = await client.post(
+                        f"{self.ollama_url}/api/generate",
+                        json={
+                            "model": "llama3.2:3b",
+                            "prompt": prompt,
+                            "stream": False,
+                            "options": {
+                                "temperature": 0.3,
+                                "num_predict": 20
+                            }
+                        }
+                    )
+
+                    if response.status_code == 200:
+                        result = response.json()
+                        refined_name = result.get('response', '').strip()
+
+                        # Clean up the response
+                        refined_name = refined_name.replace('"', '').replace("'", '').strip()
+                        refined_name = refined_name.split('\n')[0]  # Take first line only
+
+                        # Validate it's reasonable (not too long, not empty)
+                        if refined_name and len(refined_name) < 50 and len(refined_name.split()) <= 5:
+                            logger.info(f"Refined: '{topic_name}' → '{refined_name}'")
+                            refined_dict[refined_name] = paper_indices
+                        else:
+                            # Keep original if LLM output is bad
+                            refined_dict[topic_name] = paper_indices
+                    else:
+                        refined_dict[topic_name] = paper_indices
+
+            except Exception as e:
+                logger.warning(f"LLM refinement failed for '{topic_name}': {e}")
+                refined_dict[topic_name] = paper_indices
+
+        return refined_dict
 
     async def _organize_into_folders(
         self,
