@@ -9,6 +9,37 @@ let mainWindow;
 let backendProcess = null;
 let frontendProcess = null;
 
+// Kill any existing process on port 8000
+async function killExistingBackend() {
+  return new Promise((resolve) => {
+    const { exec } = require('child_process');
+
+    // Find process using port 8000
+    exec('lsof -ti :8000', (error, stdout) => {
+      if (error || !stdout.trim()) {
+        // No process found or error - port is free
+        console.log('Port 8000 is free');
+        resolve();
+        return;
+      }
+
+      const pid = stdout.trim();
+      console.log(`Found existing process on port 8000 (PID: ${pid}), killing it...`);
+
+      // Kill the process
+      exec(`kill ${pid}`, (killError) => {
+        if (killError) {
+          console.error('Failed to kill existing process:', killError);
+        } else {
+          console.log('Successfully killed existing backend process');
+        }
+        // Wait a moment for port to be freed
+        setTimeout(resolve, 1000);
+      });
+    });
+  });
+}
+
 // Check if backend is running
 function checkBackend(retries = 30) {
   return new Promise((resolve) => {
@@ -63,6 +94,9 @@ async function checkOllama() {
 
 // Start Python backend
 async function startBackend() {
+  // First, kill any existing backend process on port 8000
+  await killExistingBackend();
+
   const fs = require('fs');
   const backendPath = isDev
     ? path.join(__dirname, '..', 'backend')
@@ -356,6 +390,15 @@ async function createWindow() {
   Menu.setApplicationMenu(menu);
 
   mainWindow.on('closed', () => {
+    // On macOS, clean up backend when window closes
+    // (app might still be running in dock but no UI)
+    if (process.platform === 'darwin' && backendProcess) {
+      console.log('Window closed on macOS, stopping backend...');
+      backendProcess.kill('SIGTERM');
+      if (frontendProcess) {
+        frontendProcess.kill('SIGTERM');
+      }
+    }
     mainWindow = null;
   });
 }
@@ -364,11 +407,18 @@ async function createWindow() {
 app.on('will-quit', () => {
   if (backendProcess) {
     console.log('Stopping backend...');
-    backendProcess.kill();
+    backendProcess.kill('SIGTERM');
+    // Force kill if still running after 2 seconds
+    setTimeout(() => {
+      if (backendProcess && !backendProcess.killed) {
+        console.log('Force killing backend...');
+        backendProcess.kill('SIGKILL');
+      }
+    }, 2000);
   }
   if (frontendProcess) {
     console.log('Stopping frontend...');
-    frontendProcess.kill();
+    frontendProcess.kill('SIGTERM');
   }
 });
 
