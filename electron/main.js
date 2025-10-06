@@ -26,15 +26,31 @@ async function killExistingBackend() {
       const pid = stdout.trim();
       console.log(`Found existing process on port 8000 (PID: ${pid}), killing it...`);
 
-      // Kill the process
-      exec(`kill ${pid}`, (killError) => {
+      // Force kill the process (SIGKILL)
+      exec(`kill -9 ${pid}`, (killError) => {
         if (killError) {
           console.error('Failed to kill existing process:', killError);
+          // Try to continue anyway
+          setTimeout(resolve, 2000);
         } else {
           console.log('Successfully killed existing backend process');
+
+          // Verify port is free before continuing
+          const verifyFree = () => {
+            exec('lsof -ti :8000', (err, out) => {
+              if (err || !out.trim()) {
+                console.log('✓ Port 8000 verified free');
+                resolve();
+              } else {
+                // Port still in use, wait a bit more
+                console.log('Waiting for port to be freed...');
+                setTimeout(verifyFree, 500);
+              }
+            });
+          };
+
+          setTimeout(verifyFree, 1000);
         }
-        // Wait a moment for port to be freed
-        setTimeout(resolve, 1000);
       });
     });
   });
