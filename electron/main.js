@@ -234,27 +234,55 @@ async function startFrontend() {
 
 // Create main window
 async function createWindow() {
-  // Check dependencies first (Python, pip, packages, Graphviz, etc.)
-  const checker = new DependencyChecker();
-  const checkResult = await checker.checkAll();
+  const fs = require('fs');
+  const os = require('os');
 
-  if (!checkResult.allRequired) {
-    // Show installation dialog
-    const installResult = await checker.showInstallDialog(null);
+  // Check if dependencies were already verified (skip repeated checks)
+  const markerFile = path.join(os.homedir(), '.papersort', '.deps_verified');
+  const depsAlreadyVerified = fs.existsSync(markerFile);
 
-    if (installResult.action === 'quit') {
-      app.quit();
-      return;
-    } else if (installResult.action === 'restart') {
-      app.relaunch();
-      app.quit();
-      return;
+  let checkResult;
+
+  if (!depsAlreadyVerified) {
+    console.log('First run - checking dependencies...');
+    // Check dependencies first (Python, pip, packages, Graphviz, etc.)
+    const checker = new DependencyChecker();
+    checkResult = await checker.checkAll();
+
+    if (!checkResult.allRequired) {
+      // Show installation dialog
+      const installResult = await checker.showInstallDialog(null);
+
+      if (installResult.action === 'quit') {
+        app.quit();
+        return;
+      } else if (installResult.action === 'restart') {
+        app.relaunch();
+        app.quit();
+        return;
+      }
+      // If 'continue', proceed anyway (though some features may not work)
+    } else {
+      // All required dependencies verified - create marker file
+      const markerDir = path.join(os.homedir(), '.papersort');
+      if (!fs.existsSync(markerDir)) {
+        fs.mkdirSync(markerDir, { recursive: true });
+      }
+      fs.writeFileSync(markerFile, new Date().toISOString());
+      console.log('✓ Dependencies verified, marker created');
     }
-    // If 'continue', proceed anyway (though some features may not work)
+  } else {
+    console.log('✓ Dependencies already verified (skipping check)');
+    // Quick check - just verify Ollama status for optional features
+    const checker = new DependencyChecker();
+    checkResult = { results: { ollama: checker.commandExists('ollama') } };
   }
 
-  // Check Ollama availability (optional, but recommended)
-  if (!checkResult.results.ollama) {
+  // Check Ollama availability (optional, only ask once)
+  const ollamaMarkerFile = path.join(os.homedir(), '.papersort', '.ollama_asked');
+  const ollamaAlreadyAsked = fs.existsSync(ollamaMarkerFile);
+
+  if (!ollamaAlreadyAsked && checkResult.results && !checkResult.results.ollama) {
     const response = await dialog.showMessageBox({
       type: 'info',
       title: 'Ollama Not Detected',
@@ -264,6 +292,9 @@ async function createWindow() {
       defaultId: 0,
       cancelId: 2
     });
+
+    // Mark that we asked about Ollama (don't ask again)
+    fs.writeFileSync(ollamaMarkerFile, new Date().toISOString());
 
     if (response.response === 1) {
       // User wants to install Ollama
@@ -280,6 +311,7 @@ async function createWindow() {
       app.quit();
       return;
     }
+    // else: user chose "Continue Without AI" - proceed
   }
 
   // Start backend
