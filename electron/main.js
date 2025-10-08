@@ -257,11 +257,26 @@ async function createWindow() {
         app.quit();
         return;
       } else if (installResult.action === 'restart') {
+        // User completed installation - create marker before restart
+        // This prevents asking again after restart
+        const markerDir = path.join(os.homedir(), '.papersort');
+        if (!fs.existsSync(markerDir)) {
+          fs.mkdirSync(markerDir, { recursive: true });
+        }
+        fs.writeFileSync(markerFile, new Date().toISOString());
+        console.log('✓ Installation completed, marker created');
+
         app.relaunch();
         app.quit();
         return;
       }
-      // If 'continue', proceed anyway (though some features may not work)
+      // If 'continue', create marker too (user chose to skip)
+      const markerDir = path.join(os.homedir(), '.papersort');
+      if (!fs.existsSync(markerDir)) {
+        fs.mkdirSync(markerDir, { recursive: true });
+      }
+      fs.writeFileSync(markerFile, new Date().toISOString());
+      console.log('✓ User chose to continue, marker created');
     } else {
       // All required dependencies verified - create marker file
       const markerDir = path.join(os.homedir(), '.papersort');
@@ -428,6 +443,48 @@ async function createWindow() {
               message: 'PaperSort v2.0.0',
               detail: 'AI-powered academic paper organizer with mind-maps\n\nPowered by Ollama'
             });
+          }
+        },
+        { type: 'separator' },
+        {
+          label: 'Reset Dependency Check',
+          click: async () => {
+            const fs = require('fs');
+            const os = require('os');
+
+            const response = await dialog.showMessageBox({
+              type: 'question',
+              title: 'Reset Dependency Check',
+              message: 'Reset dependency verification?',
+              detail: 'This will make PaperSort check for dependencies again on next launch.\n\nUse this if you installed new dependencies or want to re-verify.',
+              buttons: ['Cancel', 'Reset'],
+              defaultId: 0,
+              cancelId: 0
+            });
+
+            if (response.response === 1) {
+              const markerFile = path.join(os.homedir(), '.papersort', '.deps_verified');
+              const ollamaMarkerFile = path.join(os.homedir(), '.papersort', '.ollama_asked');
+
+              try {
+                if (fs.existsSync(markerFile)) fs.unlinkSync(markerFile);
+                if (fs.existsSync(ollamaMarkerFile)) fs.unlinkSync(ollamaMarkerFile);
+
+                await dialog.showMessageBox({
+                  type: 'info',
+                  message: 'Reset Complete',
+                  detail: 'Dependency check will run on next app launch.\n\nRestart PaperSort now?',
+                  buttons: ['Later', 'Restart Now']
+                }).then(result => {
+                  if (result.response === 1) {
+                    app.relaunch();
+                    app.quit();
+                  }
+                });
+              } catch (err) {
+                dialog.showErrorBox('Reset Failed', `Could not reset: ${err.message}`);
+              }
+            }
           }
         }
       ]
