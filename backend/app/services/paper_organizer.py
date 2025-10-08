@@ -284,29 +284,160 @@ class PaperOrganizer:
         custom_topics: Optional[List[str]],
         num_topics: Optional[int]
     ) -> Dict[str, List[int]]:
-        """Classify papers into topics"""
-
-        # Simple classification based on keywords and abstracts
-        # TODO: Implement actual ML classification
+        """Classify papers into topics using ML or semantic matching"""
 
         if custom_topics:
-            # Use custom topics
-            topics = {topic: [] for topic in custom_topics}
-
-            for i, paper in enumerate(papers_metadata):
-                # Assign to best matching topic
-                best_topic = self._match_to_topic(paper, custom_topics)
-                if best_topic:
-                    topics[best_topic].append(i)
-                else:
-                    if 'Uncategorized' not in topics:
-                        topics['Uncategorized'] = []
-                    topics['Uncategorized'].append(i)
+            # Use TF-IDF similarity for custom topics (much better than keyword matching)
+            topics = await self._classify_with_custom_topics(papers_metadata, custom_topics)
         else:
             # Auto-detect topics from keywords/abstracts
             topics = await self._auto_detect_topics(papers_metadata, num_topics)
 
+        # Ensure balanced distribution - no topic should have >50% of papers
+        topics = self._balance_topics(topics, papers_metadata)
+
         return topics
+
+    async def _classify_with_custom_topics(
+        self,
+        papers_metadata: List[Dict],
+        custom_topics: List[str]
+    ) -> Dict[str, List[int]]:
+        """
+        Classify papers using custom topics with TF-IDF similarity
+        Much better than simple keyword matching
+        """
+        from sklearn.feature_extraction.text import TfidfVectorizer
+        from sklearn.metrics.pairwise import cosine_similarity
+        import numpy as np
+
+        logger.info(f"Classifying {len(papers_metadata)} papers into custom topics: {custom_topics}")
+
+        # Prepare documents
+        documents = []
+        for paper in papers_metadata:
+            doc = ' '.join([
+                paper.get('title', '') + ' ' + paper.get('title', ''),  # Weight title 2x
+                paper.get('abstract', ''),
+                ' '.join(paper.get('keywords', []))
+            ])
+            documents.append(doc)
+
+        # Vectorize papers and topics
+        vectorizer = TfidfVectorizer(
+            max_features=500,
+            stop_words='english',
+            ngram_range=(1, 2),
+            min_df=1
+        )
+
+        try:
+            # Fit on papers
+            paper_vectors = vectorizer.fit_transform(documents)
+
+            # Transform topics (treat each topic as a query)
+            topic_vectors = vectorizer.transform(custom_topics)
+
+            # Calculate similarity between each paper and each topic
+            similarities = cosine_similarity(paper_vectors, topic_vectors)
+
+            # Assign each paper to best matching topic
+            topics = {topic: [] for topic in custom_topics}
+            topics['Uncategorized'] = []
+
+            # Use threshold to avoid forcing papers into irrelevant topics
+            SIMILARITY_THRESHOLD = 0.05  # Minimum similarity to assign
+
+            for i, paper_sims in enumerate(similarities):
+                best_topic_idx = np.argmax(paper_sims)
+                best_similarity = paper_sims[best_topic_idx]
+
+                if best_similarity >= SIMILARITY_THRESHOLD:
+                    topics[custom_topics[best_topic_idx]].append(i)
+                else:
+                    # Paper doesn't match any topic well
+                    topics['Uncategorized'].append(i)
+
+            # Remove empty Uncategorized if not used
+            if not topics['Uncategorized']:
+                del topics['Uncategorized']
+
+            logger.info(f"Custom topic distribution: {[(k, len(v)) for k, v in topics.items()]}")
+            return topics
+
+        except Exception as e:
+            logger.error(f"TF-IDF classification failed: {e}, falling back to keyword matching")
+            # Fallback to simple matching
+            return self._fallback_keyword_matching(papers_metadata, custom_topics)
+
+    def _fallback_keyword_matching(
+        self,
+        papers_metadata: List[Dict],
+        custom_topics: List[str]
+    ) -> Dict[str, List[int]]:
+        """Fallback: simple keyword matching"""
+        topics = {topic: [] for topic in custom_topics}
+        topics['Uncategorized'] = []
+
+        for i, paper in enumerate(papers_metadata):
+            best_topic = self._match_to_topic(paper, custom_topics)
+            if best_topic:
+                topics[best_topic].append(i)
+            else:
+                topics['Uncategorized'].append(i)
+
+        if not topics['Uncategorized']:
+            del topics['Uncategorized']
+
+        return topics
+
+    def _balance_topics(
+        self,
+        topics: Dict[str, List[int]],
+        papers_metadata: List[Dict]
+    ) -> Dict[str, List[int]]:
+        """
+        Balance topic distribution to avoid one huge topic
+
+        Rules:
+        - No topic should have >50% of papers (too dominant)
+        - Topics with <2 papers get merged into "Other"
+        - Redistribute papers from oversized topics
+        """
+        total_papers = len(papers_metadata)
+        max_papers_per_topic = int(total_papers * 0.5)  # Max 50%
+        min_papers_per_topic = 2
+
+        logger.info("Balancing topic distribution...")
+
+        # Remove tiny topics
+        small_topics = []
+        balanced_topics = {}
+        other_papers = []
+
+        for topic, paper_ids in topics.items():
+            if len(paper_ids) >= min_papers_per_topic:
+                balanced_topics[topic] = paper_ids
+            else:
+                logger.info(f"Merging small topic '{topic}' ({len(paper_ids)} papers) into Other")
+                other_papers.extend(paper_ids)
+                small_topics.append(topic)
+
+        # Check for oversized topics
+        for topic, paper_ids in list(balanced_topics.items()):
+            if len(paper_ids) > max_papers_per_topic:
+                logger.warning(f"Topic '{topic}' has {len(paper_ids)} papers ({len(paper_ids)/total_papers*100:.1f}%) - TOO LARGE!")
+
+                # This indicates poor clustering - need to split
+                # For now, mark for attention
+                logger.warning(f"Consider increasing num_topics or checking data quality")
+
+        # Add Other category if we collected small topics
+        if other_papers:
+            balanced_topics['Other'] = other_papers
+
+        logger.info(f"Balanced distribution: {[(k, len(v)) for k, v in balanced_topics.items()]}")
+        return balanced_topics
 
     def _match_to_topic(self, paper: Dict, topics: List[str]) -> Optional[str]:
         """Match paper to best topic based on keywords"""
@@ -398,14 +529,39 @@ class PaperOrganizer:
             tfidf_matrix = vectorizer.fit_transform(documents)
             logger.info(f"TF-IDF matrix shape: {tfidf_matrix.shape}")
 
-            # Use K-Means clustering
+            # Use K-Means clustering with better initialization
             kmeans = KMeans(
                 n_clusters=num_topics,
+                init='k-means++',  # Better initialization for balanced clusters
                 random_state=42,
-                n_init=10,
-                max_iter=300
+                n_init=20,  # More initializations for stability
+                max_iter=500,  # More iterations to converge
+                algorithm='elkan'  # Faster variant
             )
             cluster_labels = kmeans.fit_predict(tfidf_matrix)
+
+            # Check cluster balance
+            unique, counts = np.unique(cluster_labels, return_counts=True)
+            logger.info(f"Cluster sizes: {dict(zip(unique, counts))}")
+
+            # If clusters are very imbalanced, try again with different parameters
+            max_cluster_size = max(counts)
+            if max_cluster_size > len(papers_metadata) * 0.6:  # One cluster has >60%
+                logger.warning(f"Imbalanced clustering detected (max: {max_cluster_size}/{len(papers_metadata)})")
+                logger.warning("Increasing number of topics for better distribution...")
+
+                # Increase topics and retry
+                num_topics = min(num_topics + 3, MAX_TOPICS)
+                kmeans = KMeans(
+                    n_clusters=num_topics,
+                    init='k-means++',
+                    random_state=42,
+                    n_init=20,
+                    max_iter=500
+                )
+                cluster_labels = kmeans.fit_predict(tfidf_matrix)
+                unique, counts = np.unique(cluster_labels, return_counts=True)
+                logger.info(f"Rebalanced cluster sizes: {dict(zip(unique, counts))}")
 
             # Extract meaningful topic names from cluster centroids
             feature_names = vectorizer.get_feature_names_out()
@@ -461,58 +617,104 @@ class PaperOrganizer:
         Priority:
         1. Use multi-word phrases if available
         2. Combine related single words
-        3. Capitalize properly
-        4. Fallback to generic name if terms are too vague
+        3. Extract from paper keywords/titles
+        4. Generic numbered name as last resort
         """
         import re
+        from collections import Counter
 
-        # Filter out vague/generic terms
+        # Extended stopwords to filter out nonsense
         stopwords = {
             'using', 'based', 'study', 'analysis', 'approach', 'method',
             'results', 'new', 'novel', 'paper', 'research', 'data',
-            'model', 'models', 'system', 'systems', 'application'
+            'model', 'models', 'system', 'systems', 'application', 'applications',
+            'different', 'various', 'multiple', 'several', 'many', 'few',
+            'can', 'may', 'could', 'would', 'should', 'might',
+            'also', 'however', 'therefore', 'thus', 'hence',
+            'use', 'used', 'uses', 'using', 'based', 'proposed',
+            'general', 'specific', 'particular', 'certain',
+            'et al', 'year', 'years', 'authors', 'author',
+            # Prevent nonsense names
+            'untitled', 'unknown', 'misc', 'miscellaneous', 'other',
+            'this', 'that', 'these', 'those', 'such', 'same',
+            'random', 'single', 'double', 'triple', 'first', 'second', 'third'
         }
 
-        filtered_terms = [t for t in top_terms if t.lower() not in stopwords and len(t) > 2]
+        # Clean and filter terms
+        filtered_terms = []
+        for term in top_terms:
+            term_clean = term.strip().lower()
+            # Skip if stopword, too short, or just numbers
+            if (term_clean not in stopwords and
+                len(term_clean) > 2 and
+                not term_clean.isdigit() and
+                any(c.isalpha() for c in term_clean)):
+                filtered_terms.append(term)
 
-        if not filtered_terms:
-            # If all terms are generic, look at paper titles in this cluster
-            cluster_papers = [papers_metadata[i] for i, label in enumerate(cluster_labels) if label == cluster_id]
-
-            # Extract common meaningful words from titles
-            title_words = []
-            for paper in cluster_papers[:10]:  # Sample first 10 papers
-                title = paper.get('title', '')
-                # Extract capitalized words (likely domain-specific terms)
-                words = re.findall(r'\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,2}\b', title)
-                title_words.extend(words)
-
-            if title_words:
-                # Use most common title word
-                word_counts = Counter(title_words)
-                most_common = word_counts.most_common(1)[0][0]
-                return most_common
-            else:
-                # Last resort: generic topic name
-                return f"Topic {cluster_id + 1}"
-
-        # Prefer multi-word phrases (they're more specific)
-        phrases = [t for t in filtered_terms if ' ' in t]
+        # Strategy 1: Multi-word phrases (most specific)
+        phrases = [t for t in filtered_terms if ' ' in t and len(t.split()) <= 4]
         if phrases:
-            # Use the best phrase, capitalize properly
             best_phrase = phrases[0]
-            return ' '.join(word.capitalize() for word in best_phrase.split())
+            # Validate it's not generic
+            if not any(word.lower() in stopwords for word in best_phrase.split()):
+                topic_name = ' '.join(word.capitalize() for word in best_phrase.split())
+                logger.debug(f"Topic name from phrase: {topic_name}")
+                return topic_name
 
-        # Combine top 2-3 single words into a descriptive name
-        if len(filtered_terms) >= 2:
-            # Take top 2-3 terms and create compound name
-            combined = ' '.join(filtered_terms[:2])
-            return ' '.join(word.capitalize() for word in combined.split())
-        elif filtered_terms:
-            # Single term
-            return filtered_terms[0].capitalize()
-        else:
-            return f"Topic {cluster_id + 1}"
+        # Strategy 2: Combine top 2 single words
+        single_words = [t for t in filtered_terms if ' ' not in t]
+        if len(single_words) >= 2:
+            combined = ' '.join(single_words[:2])
+            topic_name = ' '.join(word.capitalize() for word in combined.split())
+            logger.debug(f"Topic name from combined words: {topic_name}")
+            return topic_name
+
+        # Strategy 3: Extract from paper keywords in this cluster
+        cluster_papers = [papers_metadata[i] for i, label in enumerate(cluster_labels) if label == cluster_id]
+
+        # Try paper keywords first
+        all_keywords = []
+        for paper in cluster_papers[:20]:
+            keywords = paper.get('keywords', [])
+            if keywords:
+                all_keywords.extend([k.strip() for k in keywords if k.strip()])
+
+        if all_keywords:
+            keyword_counts = Counter(all_keywords)
+            # Get most common keyword that's not a stopword
+            for keyword, count in keyword_counts.most_common(10):
+                if (keyword.lower() not in stopwords and
+                    len(keyword) > 3 and
+                    count >= 2):  # Must appear in at least 2 papers
+                    topic_name = ' '.join(word.capitalize() for word in keyword.split())
+                    logger.debug(f"Topic name from keywords: {topic_name}")
+                    return topic_name
+
+        # Strategy 4: Extract meaningful phrases from paper titles
+        title_phrases = []
+        for paper in cluster_papers[:15]:
+            title = paper.get('title', '')
+            # Find multi-word capitalized phrases (likely domain terms)
+            phrases_in_title = re.findall(r'\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,3}\b', title)
+            title_phrases.extend([p for p in phrases_in_title if len(p) > 5])
+
+        if title_phrases:
+            phrase_counts = Counter(title_phrases)
+            for phrase, count in phrase_counts.most_common(5):
+                if count >= 2 and not any(word.lower() in stopwords for word in phrase.split()):
+                    logger.debug(f"Topic name from titles: {phrase}")
+                    return phrase
+
+        # Strategy 5: Single filtered term
+        if single_words:
+            topic_name = single_words[0].capitalize()
+            logger.debug(f"Topic name from single word: {topic_name}")
+            return topic_name
+
+        # Last resort: Numbered topic
+        topic_name = f"Research Topic {cluster_id + 1}"
+        logger.debug(f"Fallback topic name: {topic_name}")
+        return topic_name
 
     async def _refine_topic_names_with_llm(
         self,

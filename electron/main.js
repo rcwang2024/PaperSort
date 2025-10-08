@@ -241,6 +241,16 @@ async function createWindow() {
   const markerFile = path.join(os.homedir(), '.papersort', '.deps_verified');
   const depsAlreadyVerified = fs.existsSync(markerFile);
 
+  console.log('===== Dependency Check Debug =====');
+  console.log('Marker file path:', markerFile);
+  console.log('Marker exists:', depsAlreadyVerified);
+  if (depsAlreadyVerified) {
+    console.log('✓ SKIPPING dependency check (marker found)');
+  } else {
+    console.log('⚠ Running dependency check (no marker)');
+  }
+  console.log('==================================');
+
   let checkResult;
 
   if (!depsAlreadyVerified) {
