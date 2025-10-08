@@ -10,6 +10,7 @@ from typing import List, Dict, Optional, Callable
 import shutil
 import re
 from datetime import datetime
+import numpy as np
 
 from app.services.pdf_processor import EnhancedPDFExtractor
 from app.services.api_enhancer import MetadataEnhancer
@@ -303,7 +304,7 @@ class PaperOrganizer:
                     topics['Uncategorized'].append(i)
         else:
             # Auto-detect topics from keywords/abstracts
-            topics = self._auto_detect_topics(papers_metadata, num_topics)
+            topics = await self._auto_detect_topics(papers_metadata, num_topics)
 
         return topics
 
@@ -328,7 +329,7 @@ class PaperOrganizer:
 
         return best_topic if best_score > 0 else None
 
-    def _auto_detect_topics(
+    async def _auto_detect_topics(
         self,
         papers_metadata: List[Dict],
         num_topics: Optional[int]
