@@ -23,7 +23,7 @@ pyinstaller --clean --noconfirm \
     --hidden-import=uvicorn.lifespan.on \
     --add-data "app:app" \
     --target-arch arm64 \
-    --noconsole \
+    --console \
     app/main.py
 
 if [ $? -eq 0 ]; then
