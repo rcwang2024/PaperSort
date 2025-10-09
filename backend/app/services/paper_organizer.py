@@ -400,12 +400,12 @@ class PaperOrganizer:
         Balance topic distribution to avoid one huge topic
 
         Rules:
-        - No topic should have >50% of papers (too dominant)
+        - No topic should have >40% of papers (too dominant)
         - Topics with <2 papers get merged into "Other"
         - Redistribute papers from oversized topics
         """
         total_papers = len(papers_metadata)
-        max_papers_per_topic = int(total_papers * 0.5)  # Max 50%
+        max_papers_per_topic = int(total_papers * 0.4)  # Max 40%
         min_papers_per_topic = 2
 
         logger.info("Balancing topic distribution...")
@@ -546,7 +546,7 @@ class PaperOrganizer:
 
             # If clusters are very imbalanced, try again with different parameters
             max_cluster_size = max(counts)
-            if max_cluster_size > len(papers_metadata) * 0.6:  # One cluster has >60%
+            if max_cluster_size > len(papers_metadata) * 0.4:  # One cluster has >40%
                 logger.warning(f"Imbalanced clustering detected (max: {max_cluster_size}/{len(papers_metadata)})")
                 logger.warning("Increasing number of topics for better distribution...")
 
