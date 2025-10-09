@@ -122,19 +122,20 @@ async function startBackend() {
   console.log('Is development mode:', isDev);
   console.log('Resources path:', process.resourcesPath);
 
-  // Check for bundled executable first (for production)
-  const bundledExe = path.join(backendPath, 'dist', 'papersort-backend');
-
-  if (!isDev && fs.existsSync(bundledExe)) {
-    // Use bundled executable in production
-    console.log('Using bundled backend executable:', bundledExe);
-
-    backendProcess = spawn(bundledExe, [], {
-      stdio: 'pipe',
-      env: { ...process.env }
-    });
-  } else {
-    // Fall back to Python script (development mode or if bundled exe not found)
+  // DISABLED: PyInstaller bundled exe doesn't work with uvicorn on macOS when launched by Electron
+  // Always use the launcher script which runs Python directly
+  // const bundledExe = path.join(backendPath, 'dist', 'papersort-backend');
+  //
+  // if (!isDev && fs.existsSync(bundledExe)) {
+  //   // Use bundled executable in production
+  //   console.log('Using bundled backend executable:', bundledExe);
+  //
+  //   backendProcess = spawn(bundledExe, [], {
+  //     stdio: 'pipe',
+  //     env: { ...process.env }
+  //   });
+  // } else {
+    // Use Python script (works in both development and production)
     const launcherScript = path.join(backendPath, 'run_backend.sh');
     console.log('Using launcher script:', launcherScript);
 
@@ -155,7 +156,7 @@ async function startBackend() {
       stdio: 'pipe',
       env: { ...process.env }
     });
-  }
+  // }  // REMOVED: no longer needed since we always use script
 
   let backendOutput = '';
   let backendErrors = '';
