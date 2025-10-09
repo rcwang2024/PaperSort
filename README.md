@@ -80,6 +80,37 @@ That's it! 🎉
 
 ## 🛠️ For Developers
 
+### ⚠️ READ THIS FIRST
+
+**To prevent breaking the app when adding features, read these docs:**
+
+1. **[DEVELOPMENT.md](DEVELOPMENT.md)** - Required reading! Development workflow, testing, and what NOT to do
+2. **[ARCHITECTURE.md](ARCHITECTURE.md)** - System design, component interactions, critical code sections
+3. **[TROUBLESHOOTING.md](TROUBLESHOOTING.md)** - Issues we've solved (and how to avoid them)
+4. **[TESTING.md](TESTING.md)** - Test infrastructure and how to use it
+
+### Development Workflow
+
+**Before making ANY changes:**
+
+```bash
+# 1. Run existing tests (establish baseline)
+npm run test:all
+
+# 2. Make your changes
+
+# 3. Run tests again (must pass)
+npm run test:all
+
+# 4. Manual testing
+npm run electron:dev
+
+# 5. Build and test production
+npm run build
+```
+
+**Pre-commit hook** automatically runs tests before each commit to prevent breaking changes.
+
 ### Prerequisites
 
 ```bash
@@ -87,7 +118,10 @@ That's it! 🎉
 brew install node
 
 # Install Python dependencies
-pip3 install fastapi uvicorn pydantic aiosqlite httpx graphviz
+cd backend
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
 
 # Install Graphviz
 brew install graphviz
@@ -97,15 +131,20 @@ brew install ollama
 ollama pull llama3.2:3b
 ```
 
-### Development
+### Quick Start
 
 ```bash
 # Clone repository
 git clone https://github.com/rcwang2024/PaperSort.git
 cd PaperSort
 
-# Install frontend dependencies
+# Install dependencies
+npm install
 cd frontend && npm install && cd ..
+cd backend && pip install -r requirements.txt && cd ..
+
+# Run tests (important!)
+npm run test:all
 
 # Run in development mode
 npm run electron:dev
@@ -122,6 +161,14 @@ npm run build
 
 ## 📖 Documentation
 
+### For Developers (Start Here!)
+- **[DEVELOPMENT.md](DEVELOPMENT.md)** - ⚠️ Required reading! Development workflow and what NOT to do
+- **[ARCHITECTURE.md](ARCHITECTURE.md)** - System architecture, components, critical code
+- **[TROUBLESHOOTING.md](TROUBLESHOOTING.md)** - Common issues and solutions
+- **[TESTING.md](TESTING.md)** - Testing infrastructure and best practices
+- **[CLUSTERING_IMPROVEMENTS.md](CLUSTERING_IMPROVEMENTS.md)** - ML clustering implementation details
+
+### For Users
 - **[How It Works](HOW_IT_WORKS.md)** - Technical architecture and dependency system
 - **[Distribution Guide](DISTRIBUTION.md)** - Advanced build and packaging options
 - **[User Guide](README_FOR_USERS.md)** - Quick start for end users
