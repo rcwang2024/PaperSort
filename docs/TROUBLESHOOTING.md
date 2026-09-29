@@ -405,3 +405,43 @@ npm run build
 - Remove marker file logic
 - Revert to keyword matching
 - Use `--noconsole` for servers
+
+---
+
+## Backend fails to start: wrong Python environment
+
+**Symptom:** the packaged app fails to start the backend.
+
+**Cause:**
+
+The previous build failed because:
+- The packaged app was using **system Python 3.9** (from Command Line Tools)
+- The development environment used **Anaconda Python 3.13**
+- System Python had incompatible or missing packages for uvicorn/FastAPI
+
+**Fix:**
+
+`backend/run_backend.sh` now:
+
+1. **Smart Python Detection**
+   - Tries multiple Python versions: 3.13, 3.12, 3.11, 3.10, 3.9, 3.8
+   - Picks the first one that's version 3.8 or higher
+   - Shows exactly which Python it selected
+
+2. **Virtual Environment Creation**
+   - Creates `.venv` inside the app's backend folder
+   - Completely isolated from system Python
+   - Avoids conflicts with existing installations
+
+3. **Automatic Dependency Installation**
+   - On first launch, installs all required packages in the venv
+   - Takes ~2-3 minutes initially
+   - Subsequent launches are instant (packages already installed)
+
+4. **Comprehensive Logging**
+   - Shows every step in DevTools Console
+   - Displays Python version and path
+   - Shows package installation progress
+   - Reports any errors with full details
+
+The launcher checks that *all* backend packages import (not just FastAPI/Uvicorn) and installs `backend/requirements.txt` if any is missing.

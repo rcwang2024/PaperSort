@@ -174,7 +174,7 @@ When sharing PaperSort:
 ### Optional: Include Documentation
 
 You can also share:
-- `README_FOR_USERS.md` - Quick start guide
+- `docs/USER_GUIDE.md` - Quick start guide
 - `install-dependencies.sh` - Standalone installer (if user prefers manual)
 
 But the DMG alone is enough - the app guides users through everything!

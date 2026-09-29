@@ -12,10 +12,10 @@ This document exists to prevent that cycle. Please read it carefully.
 
 Before making ANY changes, read these documents in order:
 
-1. **[DEVELOPMENT.md](DEVELOPMENT.md)** - Development workflow, testing requirements, common pitfalls
-2. **[ARCHITECTURE.md](ARCHITECTURE.md)** - System design, components, critical code sections
-3. **[TROUBLESHOOTING.md](TROUBLESHOOTING.md)** - Issues we've already solved (don't repeat them)
-4. **[TESTING.md](TESTING.md)** - Testing infrastructure and how to use it
+1. **[DEVELOPMENT.md](docs/DEVELOPMENT.md)** - Development workflow, testing requirements, common pitfalls
+2. **[ARCHITECTURE.md](docs/ARCHITECTURE.md)** - System design, components, critical code sections
+3. **[TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)** - Issues we've already solved (don't repeat them)
+4. **[TESTING.md](docs/TESTING.md)** - Testing infrastructure and how to use it
 
 **Not optional.** These docs contain critical information about what NOT to do.
 
@@ -23,7 +23,7 @@ Before making ANY changes, read these documents in order:
 
 - [ ] I have read DEVELOPMENT.md, ARCHITECTURE.md, and TROUBLESHOOTING.md
 - [ ] I understand the component architecture
-- [ ] I know which code sections are critical (ARCHITECTURE.md)
+- [ ] I know which code sections are critical (docs/ARCHITECTURE.md)
 - [ ] I understand the testing requirements
 - [ ] I have set up the development environment
 - [ ] All existing tests pass on my machine
@@ -128,7 +128,7 @@ open dist-installer/PaperSort-2.0.0-arm64.dmg
 
 ### 8. Commit
 
-**Pre-commit hook will run tests automatically.**
+**Run `npm test` before committing** — all backend and frontend tests must pass.
 
 ```bash
 git add <files>
@@ -213,9 +213,9 @@ git push origin feature/your-feature-name
 
 ## Questions?
 
-- Check **[TROUBLESHOOTING.md](TROUBLESHOOTING.md)** for common issues
-- Check **[DEVELOPMENT.md](DEVELOPMENT.md)** for development workflow
-- Check **[ARCHITECTURE.md](ARCHITECTURE.md)** for system design
+- Check **[TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)** for common issues
+- Check **[DEVELOPMENT.md](docs/DEVELOPMENT.md)** for development workflow
+- Check **[ARCHITECTURE.md](docs/ARCHITECTURE.md)** for system design
 - Open an issue if you need clarification
 
 ## License

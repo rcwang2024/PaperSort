@@ -1,91 +1,32 @@
-# PaperSort Frontend
+# PaperSort frontend
 
-Modern desktop application built with Tauri + React + TypeScript.
+React 18 + TypeScript UI, bundled with Vite and loaded by the Electron shell in [`../electron`](../electron).
+It talks to the FastAPI backend on `http://127.0.0.1:8000` (REST, plus a WebSocket for organisation progress).
 
-## Tech Stack
+## Structure
 
-- **Tauri** - Lightweight desktop app framework
-- **React 18** - UI framework
-- **TypeScript** - Type safety
-- **TailwindCSS** - Styling
-- **Vite** - Build tool
-- **Cytoscape.js** - Mind-map visualization
+```
+src/
+  App.tsx                 app state and layout
+  components/
+    FolderSelector.tsx    folder picker and organisation options
+    ProgressTracker.tsx   live progress over WebSocket
+    TopicList.tsx         organised topics and papers
+    MindMapWindow.tsx     mind-map SVG and summary
+    ReferenceManager.tsx  BibTeX export
+  services/api.ts         backend API client
+  types/                  shared types, incl. the window.electron bridge
+  tests/                  Vitest + Testing Library unit tests
+e2e/                      Playwright end-to-end tests
+```
 
-## Development Setup
-
-### Prerequisites
-
-- Node.js 18+ and npm
-- Rust (for Tauri)
-- Backend server running on `http://127.0.0.1:8000`
-
-### Install Dependencies
+## Scripts
 
 ```bash
-npm install
+npm run dev        # Vite dev server on http://localhost:1420 (used by `npm run electron:dev` in the repo root)
+npm run build      # type-check and production build to dist/
+npx vitest run     # unit tests
+npm run test:e2e   # Playwright tests (needs the backend running)
 ```
 
-### Run Development Server
-
-```bash
-npm run tauri:dev
-```
-
-This will:
-1. Start Vite dev server
-2. Launch Tauri development window
-3. Hot reload on file changes
-
-## Project Structure
-
-```
-frontend/
-├── src/
-│   ├── components/      # React components
-│   │   ├── PaperLibrary.tsx
-│   │   ├── MindMapViewer.tsx
-│   │   └── BibTeXExporter.tsx
-│   ├── services/        # API clients
-│   │   └── api.ts
-│   ├── types/           # TypeScript types
-│   ├── App.tsx          # Main app component
-│   └── main.tsx         # Entry point
-├── src-tauri/           # Tauri backend (Rust)
-│   ├── src/
-│   │   └── main.rs
-│   ├── tauri.conf.json
-│   └── Cargo.toml
-├── public/              # Static assets
-├── package.json
-├── tsconfig.json
-└── vite.config.ts
-```
-
-## Building for Production
-
-```bash
-npm run tauri:build
-```
-
-This creates installers in `src-tauri/target/release/bundle/`:
-- macOS: `.app` and `.dmg`
-- Windows: `.msi`
-- Linux: `.deb`, `.AppImage`
-
-## Features
-
-- 📚 Paper library management
-- 🔍 Full-text search
-- 🗺️ Interactive mind-maps
-- 📝 BibTeX export
-- ⚡ Real-time progress updates (WebSocket)
-- 🎨 Modern, responsive UI
-
-## API Integration
-
-The frontend communicates with the FastAPI backend via REST API:
-
-- Papers: `http://127.0.0.1:8000/api/papers`
-- Mind-maps: `http://127.0.0.1:8000/api/mindmap`
-- Export: `http://127.0.0.1:8000/api/export`
-- WebSocket: `ws://127.0.0.1:8000/ws/progress`
+Outside Electron (plain browser), folder selection falls back to a text prompt for the path.

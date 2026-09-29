@@ -63,6 +63,11 @@ temp/
 # Testing
 coverage/
 .nyc_output/
+.coverage
+htmlcov/
+.pytest_cache/
+playwright-report/
+test-results/
 
 # Electron
 out/

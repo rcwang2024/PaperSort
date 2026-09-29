@@ -1,206 +1,94 @@
-# PaperSort v2.0
+# PaperSort
 
-🧠 AI-Powered Academic Paper Organizer with Intelligent Mind-Maps
+**A desktop app that organises a folder of research PDFs into topics, renames them consistently, and generates
+mind-maps, summaries and BibTeX — with a local LLM, so your papers never leave your machine.**
 
-PaperSort automatically organizes your research papers by topic and generates insightful mind-maps and summaries using local AI.
+![Electron](https://img.shields.io/badge/Electron-28-47848F?logo=electron&logoColor=white)
+![React](https://img.shields.io/badge/React-18%20%2B%20TypeScript-61DAFB?logo=react&logoColor=black)
+![FastAPI](https://img.shields.io/badge/FastAPI-Python%203.11-009688?logo=fastapi&logoColor=white)
+![scikit-learn](https://img.shields.io/badge/scikit--learn-TF--IDF%20%2B%20K--Means-F7931E?logo=scikitlearn&logoColor=white)
+![Ollama](https://img.shields.io/badge/Ollama-local%20LLM-000000)
+![License](https://img.shields.io/badge/license-MIT-blue)
 
-![PaperSort Screenshot](docs/screenshot.png)
+![PaperSort organising 12 papers into 3 topics](docs/screenshot.png)
 
-## ✨ Features
+## Features
 
-### 📁 Smart Organization
-- **Automatic Topic Classification**: AI analyzes papers and groups them by research area
-- **Copy or Move Mode**: Keep originals intact or organize in place
-- **Metadata Extraction**: Automatically extracts titles, authors, abstracts
+- **Topic organisation** — clusters papers by content (TF-IDF + K-Means) and copies or moves them into topic folders (max 15 topics, auto-balanced).
+- **Consistent file names** — `[Year] Title - FirstAuthor.pdf`, from metadata extracted with PyMuPDF.
+- **Mind-maps & summaries** — a local LLM (Ollama, `llama3.2:3b`) extracts problem, method, results and contributions; rendered as SVG with Graphviz.
+- **BibTeX export** — validated entries, with optional metadata enrichment from CrossRef, arXiv and Semantic Scholar.
+- **Full-text search** — papers are stored in SQLite with an FTS5 index.
 
-### 🧠 Mind-Map Visualization
-- **Visual Paper Structure**: See methodology, contributions, and results at a glance
-- **Interactive SVG**: Beautiful, scalable mind-map diagrams
-- **AI-Powered Analysis**: Uses local LLM for intelligent structure extraction
+**Privacy:** PDF parsing, clustering and the LLM all run locally. The only network access is the optional
+*Enhance metadata* step of the BibTeX export, which sends titles/DOIs to the services above — untick it to stay fully offline.
 
-### 📝 Intelligent Summaries
-- **Analytical Insights**: Goes beyond extraction to provide synthesis and interpretation
-- **Comprehensive Coverage**: Problem statement, methodology, results, and significance
-- **WHY and HOW**: Explains reasoning and impact, not just what was done
+## How it works
 
-### 🔒 Privacy-First
-- **100% Local Processing**: All AI runs on your machine via Ollama
-- **No Cloud Dependencies**: Your research stays private
-- **Offline Capable**: Works without internet connection
-
-## 🚀 Quick Start
-
-### Installation
-
-1. **Download** the latest release:
-   - [PaperSort-2.0.0-arm64.dmg](https://github.com/rcwang2024/PaperSort/releases)
-
-2. **Install**:
-   - Open the DMG file
-   - Drag PaperSort to Applications folder
-   - Launch PaperSort
-
-3. **First Run Setup**:
-   - PaperSort will automatically check for dependencies
-   - Click "Auto Install" to install required dependencies (~5 minutes)
-   - Optionally install Ollama for AI features
-
-That's it! 🎉
-
-## 📋 Requirements
-
-### Required (Auto-installed)
-- macOS 10.12+ (Apple Silicon)
-- Python 3.11+
-- Graphviz
-
-### Optional (Recommended)
-- Ollama (for AI-powered features)
-
-## 🎯 Usage
-
-### Organize Papers
-
-1. Click **"Choose Folder"** and select your papers directory
-2. Enable **"Copy Mode"** to keep originals safe
-3. Click **"Organize Papers"**
-4. PaperSort analyzes and categorizes your papers
-
-### View Mind-Maps
-
-1. Click the **🧠 icon** next to any paper
-2. Explore the interactive visualization
-3. Read the AI-generated summary
-
-### Export Results
-
-- Organized papers are saved to timestamped folders
-- Mind-maps can be downloaded as SVG
-- Summaries are accessible from the UI
-
-## 🛠️ For Developers
-
-### ⚠️ READ THIS FIRST
-
-**To prevent breaking the app when adding features, read these docs:**
-
-1. **[DEVELOPMENT.md](DEVELOPMENT.md)** - Required reading! Development workflow, testing, and what NOT to do
-2. **[ARCHITECTURE.md](ARCHITECTURE.md)** - System design, component interactions, critical code sections
-3. **[TROUBLESHOOTING.md](TROUBLESHOOTING.md)** - Issues we've solved (and how to avoid them)
-4. **[TESTING.md](TESTING.md)** - Test infrastructure and how to use it
-
-### Development Workflow
-
-**Before making ANY changes:**
-
-```bash
-# 1. Run existing tests (establish baseline)
-npm run test:all
-
-# 2. Make your changes
-
-# 3. Run tests again (must pass)
-npm run test:all
-
-# 4. Manual testing
-npm run electron:dev
-
-# 5. Build and test production
-npm run build
+```
+Electron shell ──► React + TypeScript UI (Vite)
+      │                    │  REST + WebSocket progress
+      │ starts             ▼
+      └──────────► FastAPI backend (127.0.0.1:8000)
+                     ├─ PDF extraction ........ PyMuPDF / PyPDF2
+                     ├─ Topic clustering ...... TF-IDF (1–3-grams) + K-Means, topic naming from top terms
+                     ├─ Mind-maps ............. Ollama (optional) → Graphviz SVG
+                     ├─ BibTeX export ......... CrossRef / arXiv / Semantic Scholar (optional)
+                     └─ Storage ............... SQLite + FTS5 (~/.papersort)
 ```
 
-**Pre-commit hook** automatically runs tests before each commit to prevent breaking changes.
+Details: [architecture](docs/ARCHITECTURE.md) · [clustering](docs/CLUSTERING_IMPROVEMENTS.md) · [how the app starts its backend](docs/HOW_IT_WORKS.md)
 
-### Prerequisites
+## Getting started
 
-```bash
-# Install Node.js and npm
-brew install node
+Prebuilt installers are not published yet — build from source (macOS, Apple Silicon is the packaged target;
+the backend and UI also run on Linux and Windows for development).
 
-# Install Python dependencies
-cd backend
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-
-# Install Graphviz
-brew install graphviz
-
-# Optional: Install Ollama
-brew install ollama
-ollama pull llama3.2:3b
-```
-
-### Quick Start
+**Requirements:** Node.js 18+, Python 3.11, [Graphviz](https://graphviz.org/download/), and optionally [Ollama](https://ollama.com) for AI mind-maps.
 
 ```bash
-# Clone repository
 git clone https://github.com/rcwang2024/PaperSort.git
 cd PaperSort
 
-# Install dependencies
-npm install
-cd frontend && npm install && cd ..
-cd backend && pip install -r requirements.txt && cd ..
+# Backend
+cd backend
+python3.11 -m venv venv && source venv/bin/activate
+pip install -r requirements.txt
+cd ..
 
-# Run tests (important!)
-npm run test:all
+# Frontend + Electron (also installs frontend/ via postinstall)
+npm install
+
+# Optional: local LLM for mind-maps
+ollama pull llama3.2:3b
 
 # Run in development mode
 npm run electron:dev
 ```
 
-### Build Distribution
+Build a macOS installer with `npm run build` (output: `dist-installer/PaperSort-2.0.0-arm64.dmg`).
+See the [user guide](docs/USER_GUIDE.md) and [install notes](docs/INSTALL.md).
+
+## Tests
 
 ```bash
-# Build DMG for distribution
-npm run build
-
-# Output: dist-installer/PaperSort-2.0.0-arm64.dmg
+npm test                 # backend (pytest) + frontend (Vitest)
+npm run test:e2e         # Playwright end-to-end tests
 ```
 
-## 📖 Documentation
+50 backend tests (unit + API integration) and 20 frontend tests. See [docs/TESTING.md](docs/TESTING.md).
 
-### For Developers (Start Here!)
-- **[DEVELOPMENT.md](DEVELOPMENT.md)** - ⚠️ Required reading! Development workflow and what NOT to do
-- **[ARCHITECTURE.md](ARCHITECTURE.md)** - System architecture, components, critical code
-- **[TROUBLESHOOTING.md](TROUBLESHOOTING.md)** - Common issues and solutions
-- **[TESTING.md](TESTING.md)** - Testing infrastructure and best practices
-- **[CLUSTERING_IMPROVEMENTS.md](CLUSTERING_IMPROVEMENTS.md)** - ML clustering implementation details
+## Documentation
 
-### For Users
-- **[How It Works](HOW_IT_WORKS.md)** - Technical architecture and dependency system
-- **[Distribution Guide](DISTRIBUTION.md)** - Advanced build and packaging options
-- **[User Guide](README_FOR_USERS.md)** - Quick start for end users
+| For developers | For users |
+|---|---|
+| [Development workflow](docs/DEVELOPMENT.md) | [User guide](docs/USER_GUIDE.md) |
+| [Architecture](docs/ARCHITECTURE.md) | [Installation](docs/INSTALL.md) |
+| [Testing](docs/TESTING.md) | [Troubleshooting](docs/TROUBLESHOOTING.md) |
+| [Clustering](docs/CLUSTERING_IMPROVEMENTS.md) · [Distribution](docs/DISTRIBUTION.md) | [How it works](docs/HOW_IT_WORKS.md) |
 
-## 🤝 Contributing
+Contributions are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md).
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+## License
 
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
-
-## 📝 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 🙏 Acknowledgments
-
-- **Ollama** - Local LLM inference
-- **Graphviz** - Graph visualization
-- **FastAPI** - Modern Python web framework
-- **Electron** - Cross-platform desktop apps
-- **React** - UI framework
-
-## 📧 Contact
-
-Ruichao Wang - [@rcwang2024](https://github.com/rcwang2024)
-
-Project Link: [https://github.com/rcwang2024/PaperSort](https://github.com/rcwang2024/PaperSort)
-
----
-
-⭐ If you find PaperSort useful, please consider giving it a star!
+MIT — see [LICENSE](LICENSE). Built with Ollama, Graphviz, FastAPI, Electron and React.

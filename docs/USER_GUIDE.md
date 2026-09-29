@@ -17,7 +17,7 @@ An AI-powered tool to organize your research papers and generate insightful mind
 
 **Option A - Automated (Recommended)**:
 ```bash
-curl -o ~/Downloads/install-papersort.sh https://raw.githubusercontent.com/YOUR-REPO/main/install-dependencies.sh
+curl -o ~/Downloads/install-papersort.sh https://raw.githubusercontent.com/rcwang2024/PaperSort/main/install-dependencies.sh
 bash ~/Downloads/install-papersort.sh
 ```
 
@@ -110,7 +110,7 @@ ollama pull llama3.2:3b
 
 ## Support
 
-- **Issues**: [GitHub Issues](https://github.com/YOUR-REPO/issues)
+- **Issues**: [GitHub Issues](https://github.com/rcwang2024/PaperSort/issues)
 - **Documentation**: See `DISTRIBUTION.md` for advanced setup
 
 ---

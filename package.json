@@ -17,7 +17,7 @@
     "test:backend:unit": "cd backend && . venv/bin/activate && pytest tests/unit -v",
     "test:backend:integration": "cd backend && . venv/bin/activate && pytest tests/integration -v",
     "test:backend:coverage": "cd backend && . venv/bin/activate && pytest --cov=app --cov-report=html",
-    "test:frontend": "cd frontend && npm test",
+    "test:frontend": "cd frontend && npx vitest run",
     "test:frontend:ui": "cd frontend && npm run test:ui",
     "test:frontend:coverage": "cd frontend && npm run test:coverage",
     "test:e2e": "cd frontend && npm run test:e2e",
@@ -81,12 +81,16 @@
       {
         "from": "frontend/dist",
         "to": "frontend/dist",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*"
+        ]
       },
       {
         "from": "backend/dist",
         "to": "backend/dist",
-        "filter": ["papersort-backend"]
+        "filter": [
+          "papersort-backend"
+        ]
       },
       {
         "from": "backend",
