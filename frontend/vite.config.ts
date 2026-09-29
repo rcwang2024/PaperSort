@@ -19,6 +19,8 @@ export default defineConfig({
     globals: true,
     environment: 'jsdom',
     setupFiles: './src/tests/setup.ts',
+    // e2e/*.spec.ts are Playwright tests (npm run test:e2e), not Vitest tests
+    include: ['src/**/*.test.{ts,tsx}'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],

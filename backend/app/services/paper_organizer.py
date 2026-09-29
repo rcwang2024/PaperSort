@@ -924,8 +924,9 @@ Respond with ONLY the topic name, nothing else. Make it specific and academic.""
     def _generate_filename(self, paper: Dict) -> str:
         """Generate filename: [Year] Title - FirstAuthorLastName.pdf"""
 
-        year = paper.get('year', 'Unknown')
-        title = paper.get('title', 'Untitled')
+        # `or` (not a .get default): the keys exist with value None when extraction fails
+        year = paper.get('year') or 'Unknown'
+        title = paper.get('title') or 'Untitled'
 
         # Clean title
         title = re.sub(r'[<>:"/\\|?*]', '', title)
@@ -934,7 +935,9 @@ Respond with ONLY the topic name, nothing else. Make it specific and academic.""
         # Get FIRST author's last name only
         authors = paper.get('authors', [])
         if authors:
-            first_author = authors[0]  # Only first author
+            # Only first author; PDF metadata often packs all authors into one
+            # string ("A. Author; B. Researcher"), so split that off first
+            first_author = re.split(r';| and ', authors[0])[0].strip()
             # Extract last name
             parts = first_author.split()
             last_name = parts[-1] if parts else 'Unknown'

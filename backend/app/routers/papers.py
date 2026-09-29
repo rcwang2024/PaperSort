@@ -52,19 +52,19 @@ async def upload_paper(
                 metadata = await enhancer.enhance_metadata(metadata)
 
         # Add to database
-        db = DatabaseManager()
-        await db.initialize()
-        paper_id = await db.add_paper(
-            metadata=metadata,
-            file_path=temp_path,
-            full_text=metadata.get('full_text', '')
-        )
-
-        paper = await db.get_paper(paper_id)
-        await db.close()
+        async with DatabaseManager() as db:
+            paper_id = await db.add_paper(
+                metadata=metadata,
+                file_path=temp_path,
+                full_text=metadata.get('full_text', '')
+            )
+            paper = await db.get_paper(paper_id)
 
         return paper
 
+    except HTTPException:
+        # Deliberate 4xx/5xx responses raised above must not be turned into 500s
+        raise
     except Exception as e:
         logger.error(f"Error uploading paper: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -99,10 +99,8 @@ async def batch_process(request: BatchProcessRequest):
 async def get_paper(paper_id: int):
     """Get paper by ID"""
 
-    db = DatabaseManager()
-    await db.initialize()
-    paper = await db.get_paper(paper_id)
-    await db.close()
+    async with DatabaseManager() as db:
+        paper = await db.get_paper(paper_id)
 
     if not paper:
         raise HTTPException(status_code=404, detail="Paper not found")
@@ -114,10 +112,8 @@ async def get_paper(paper_id: int):
 async def list_papers(limit: int = 100, offset: int = 0):
     """List all papers with pagination"""
 
-    db = DatabaseManager()
-    await db.initialize()
-    papers = await db.get_all_papers(limit=limit, offset=offset)
-    await db.close()
+    async with DatabaseManager() as db:
+        papers = await db.get_all_papers(limit=limit, offset=offset)
 
     return papers
 
@@ -126,14 +122,12 @@ async def list_papers(limit: int = 100, offset: int = 0):
 async def search_papers(request: PaperSearchRequest):
     """Search papers using full-text search"""
 
-    db = DatabaseManager()
-    await db.initialize()
-    papers = await db.search_papers(
-        query=request.query,
-        limit=request.limit,
-        offset=request.offset
-    )
-    await db.close()
+    async with DatabaseManager() as db:
+        papers = await db.search_papers(
+            query=request.query,
+            limit=request.limit,
+            offset=request.offset
+        )
 
     return papers
 
@@ -142,22 +136,18 @@ async def search_papers(request: PaperSearchRequest):
 async def update_paper(paper_id: int, updates: PaperUpdate):
     """Update paper metadata"""
 
-    db = DatabaseManager()
-    await db.initialize()
+    async with DatabaseManager() as db:
+        # Check if paper exists
+        paper = await db.get_paper(paper_id)
+        if not paper:
+            raise HTTPException(status_code=404, detail="Paper not found")
 
-    # Check if paper exists
-    paper = await db.get_paper(paper_id)
-    if not paper:
-        await db.close()
-        raise HTTPException(status_code=404, detail="Paper not found")
+        # Update
+        update_dict = updates.model_dump(exclude_unset=True)
+        await db.update_paper(paper_id, update_dict)
 
-    # Update
-    update_dict = updates.model_dump(exclude_unset=True)
-    await db.update_paper(paper_id, update_dict)
-
-    # Get updated paper
-    paper = await db.get_paper(paper_id)
-    await db.close()
+        # Get updated paper
+        paper = await db.get_paper(paper_id)
 
     return paper
 
@@ -166,16 +156,12 @@ async def update_paper(paper_id: int, updates: PaperUpdate):
 async def delete_paper(paper_id: int):
     """Delete a paper"""
 
-    db = DatabaseManager()
-    await db.initialize()
+    async with DatabaseManager() as db:
+        paper = await db.get_paper(paper_id)
+        if not paper:
+            raise HTTPException(status_code=404, detail="Paper not found")
 
-    paper = await db.get_paper(paper_id)
-    if not paper:
-        await db.close()
-        raise HTTPException(status_code=404, detail="Paper not found")
-
-    await db.delete_paper(paper_id)
-    await db.close()
+        await db.delete_paper(paper_id)
 
     return {"message": "Paper deleted successfully"}
 
@@ -184,9 +170,7 @@ async def delete_paper(paper_id: int):
 async def get_statistics():
     """Get database statistics"""
 
-    db = DatabaseManager()
-    await db.initialize()
-    stats = await db.get_statistics()
-    await db.close()
+    async with DatabaseManager() as db:
+        stats = await db.get_statistics()
 
     return stats

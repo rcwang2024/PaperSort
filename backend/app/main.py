@@ -53,7 +53,15 @@ app = FastAPI(
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:1420"],  # Tauri dev server
+    allow_origins=[
+        "http://localhost:1420",   # Vite dev server (npm run electron:dev)
+        "http://127.0.0.1:1420",
+        "http://localhost:3000",
+        # The packaged app loads the UI from file://, which Chromium sends as
+        # Origin "null"; without it every POST preflight is rejected (400).
+        # Safe here because the backend only listens on 127.0.0.1.
+        "null",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

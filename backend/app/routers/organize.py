@@ -104,6 +104,9 @@ async def organize_folder(request: OrganizeFolderRequest):
             'errors': results['errors']
         }
 
+    except HTTPException:
+        # Deliberate 4xx/5xx responses raised above must not be turned into 500s
+        raise
     except Exception as e:
         logger.error(f"Error organizing folder: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -177,6 +180,9 @@ async def _run_organization_task(task_id: str, request: OrganizeFolderRequest):
             'results': structure
         }
 
+    except HTTPException:
+        # Deliberate 4xx/5xx responses raised above must not be turned into 500s
+        raise
     except Exception as e:
         logger.error(f"Task {task_id} failed: {e}")
         active_tasks[task_id] = {
@@ -267,6 +273,9 @@ async def get_folder_structure(folder_path: str):
             'total_papers': sum(len(papers) for papers in topics.values())
         }
 
+    except HTTPException:
+        # Deliberate 4xx/5xx responses raised above must not be turned into 500s
+        raise
     except Exception as e:
         logger.error(f"Error reading folder structure: {e}")
         raise HTTPException(status_code=500, detail=str(e))

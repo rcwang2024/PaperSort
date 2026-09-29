@@ -11,7 +11,7 @@ afterEach(() => {
   cleanup()
 })
 
-// Mock window.electron for Electron/Tauri APIs
+// Mock window.electron (the API exposed by electron/preload.js)
 global.window = Object.create(window)
 Object.defineProperty(window, 'electron', {
   value: {
@@ -21,16 +21,3 @@ Object.defineProperty(window, 'electron', {
   },
   writable: true,
 })
-
-// Mock Tauri API
-vi.mock('@tauri-apps/api/dialog', () => ({
-  open: vi.fn(),
-  save: vi.fn(),
-  message: vi.fn(),
-}))
-
-vi.mock('@tauri-apps/api/fs', () => ({
-  readTextFile: vi.fn(),
-  writeTextFile: vi.fn(),
-  readDir: vi.fn(),
-}))

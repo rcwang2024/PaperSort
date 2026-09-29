@@ -332,4 +332,14 @@ class DatabaseManager:
         """Close database connection"""
         if self.connection:
             await self.connection.close()
+            self.connection = None
             logger.info("Database connection closed")
+
+    async def __aenter__(self):
+        await self.initialize()
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb):
+        # Always release the connection -- an open aiosqlite connection keeps a
+        # background thread alive (leaks in the server, hangs the test process)
+        await self.close()

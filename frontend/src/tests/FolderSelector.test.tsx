@@ -98,7 +98,7 @@ describe('FolderSelector', () => {
       />
     )
 
-    const numTopicsInput = screen.getByPlaceholderText('Auto')
+    const numTopicsInput = screen.getByPlaceholderText(/^Auto/)
     await user.type(numTopicsInput, '5')
 
     expect(numTopicsInput).toHaveValue(5)
@@ -148,8 +148,8 @@ describe('FolderSelector', () => {
     })
     vi.mocked(PaperSortAPI.connectProgressWebSocket).mockReturnValue(mockWs)
 
-    // Mock window.prompt for folder selection
-    window.prompt = vi.fn().mockReturnValue('/test/folder')
+    // The test setup provides window.electron, so the component uses the native picker
+    vi.mocked(window.electron.selectFolder).mockResolvedValue('/test/folder')
 
     render(
       <FolderSelector
@@ -187,8 +187,8 @@ describe('FolderSelector', () => {
       new Error('API Error')
     )
 
-    // Mock window.prompt for folder selection
-    window.prompt = vi.fn().mockReturnValue('/test/folder')
+    // The test setup provides window.electron, so the component uses the native picker
+    vi.mocked(window.electron.selectFolder).mockResolvedValue('/test/folder')
 
     render(
       <FolderSelector

@@ -71,16 +71,17 @@ export class PaperSortAPI {
     });
 
     if (!response.ok) {
-      // Try to get detailed error message from response
+      // Try to get detailed error message from response (e.g. "Cannot connect to Ollama").
+      // Only JSON parsing may fail here -- the Error must be thrown outside the try,
+      // otherwise the catch swallows it and the user only sees the status text.
+      let detail: string | undefined;
       try {
         const errorData = await response.json();
-        if (errorData.detail) {
-          throw new Error(errorData.detail);
-        }
+        detail = errorData.detail;
       } catch (e) {
         // If parsing fails, use status text
       }
-      throw new Error(`Failed to generate mind-map: ${response.statusText}`);
+      throw new Error(detail || `Failed to generate mind-map: ${response.statusText}`);
     }
 
     return response.json();

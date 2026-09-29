@@ -26,19 +26,14 @@ async def generate_mindmap(request: MindMapRequest):
     try:
         # Prioritize database lookup if paper_id is provided
         if request.paper_id is not None:
-            db = DatabaseManager()
-            await db.initialize()
-
-            paper = await db.get_paper(request.paper_id)
+            async with DatabaseManager() as db:
+                paper = await db.get_paper(request.paper_id)
             if not paper:
-                await db.close()
                 raise HTTPException(status_code=404, detail="Paper not found")
 
             title = paper.get('title', 'Untitled')
             abstract = paper.get('abstract', '')
             full_text = paper.get('full_text', '')
-
-            await db.close()
         # Fallback to direct paper data (for organized papers not in database)
         elif request.paper_title:
             title = request.paper_title
@@ -81,6 +76,9 @@ async def generate_mindmap(request: MindMapRequest):
             'generation_time': generation_time
         }
 
+    except HTTPException:
+        # Deliberate 4xx/5xx responses raised above must not be turned into 500s
+        raise
     except Exception as e:
         error_msg = str(e)
         logger.error(f"Mind-map generation error: {error_msg}", exc_info=True)
@@ -110,19 +108,14 @@ async def get_mindmap_svg(
     """Get mind-map as SVG image"""
 
     try:
-        db = DatabaseManager()
-        await db.initialize()
-
-        paper = await db.get_paper(paper_id)
+        async with DatabaseManager() as db:
+            paper = await db.get_paper(paper_id)
         if not paper:
-            await db.close()
             raise HTTPException(status_code=404, detail="Paper not found")
 
         title = paper.get('title', 'Untitled')
         abstract = paper.get('abstract', '')
         full_text = paper.get('full_text', '')
-
-        await db.close()
 
         # Generate mind-map
         generator = PaperMindMapGenerator()
@@ -142,6 +135,9 @@ async def get_mindmap_svg(
 
         return Response(content=svg_data, media_type="image/svg+xml")
 
+    except HTTPException:
+        # Deliberate 4xx/5xx responses raised above must not be turned into 500s
+        raise
     except Exception as e:
         logger.error(f"SVG generation error: {e}")
         raise HTTPException(status_code=500, detail=str(e))

@@ -23,20 +23,16 @@ async def export_bibtex(request: BibTeXExportRequest):
     """Export papers to BibTeX format"""
 
     try:
-        db = DatabaseManager()
-        await db.initialize()
-
         # Get papers
-        if request.paper_ids:
-            papers = []
-            for paper_id in request.paper_ids:
-                paper = await db.get_paper(paper_id)
-                if paper:
-                    papers.append(paper)
-        else:
-            papers = await db.get_all_papers(limit=10000)
-
-        await db.close()
+        async with DatabaseManager() as db:
+            if request.paper_ids:
+                papers = []
+                for paper_id in request.paper_ids:
+                    paper = await db.get_paper(paper_id)
+                    if paper:
+                        papers.append(paper)
+            else:
+                papers = await db.get_all_papers(limit=10000)
 
         if not papers:
             raise HTTPException(status_code=400, detail="No papers found to export")
@@ -69,6 +65,9 @@ async def export_bibtex(request: BibTeXExportRequest):
             'validation_errors': validation_errors
         }
 
+    except HTTPException:
+        # Deliberate 4xx/5xx responses raised above must not be turned into 500s
+        raise
     except Exception as e:
         logger.error(f"Export error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -79,21 +78,17 @@ async def download_bibtex(paper_ids: str = None, enhance: bool = False):
     """Download BibTeX file"""
 
     try:
-        db = DatabaseManager()
-        await db.initialize()
-
         # Parse paper IDs if provided
-        if paper_ids:
-            ids = [int(id.strip()) for id in paper_ids.split(',') if id.strip()]
-            papers = []
-            for paper_id in ids:
-                paper = await db.get_paper(paper_id)
-                if paper:
-                    papers.append(paper)
-        else:
-            papers = await db.get_all_papers(limit=10000)
-
-        await db.close()
+        async with DatabaseManager() as db:
+            if paper_ids:
+                ids = [int(id.strip()) for id in paper_ids.split(',') if id.strip()]
+                papers = []
+                for paper_id in ids:
+                    paper = await db.get_paper(paper_id)
+                    if paper:
+                        papers.append(paper)
+            else:
+                papers = await db.get_all_papers(limit=10000)
 
         if not papers:
             raise HTTPException(status_code=400, detail="No papers found")
@@ -120,6 +115,9 @@ async def download_bibtex(paper_ids: str = None, enhance: bool = False):
             }
         )
 
+    except HTTPException:
+        # Deliberate 4xx/5xx responses raised above must not be turned into 500s
+        raise
     except Exception as e:
         logger.error(f"Download error: {e}")
         raise HTTPException(status_code=500, detail=str(e))

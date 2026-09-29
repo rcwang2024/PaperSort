@@ -8,6 +8,9 @@ interface TopicListProps {
   topics: Topic[];
 }
 
+// Index of the last path separator, for both POSIX ("/") and Windows ("\") paths
+const lastSeparator = (path: string) => Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'));
+
 export default function TopicList({ topics }: TopicListProps) {
   const [expandedTopics, setExpandedTopics] = useState<Set<string>>(new Set());
   const [selectedPaper, setSelectedPaper] = useState<Paper | null>(null);
@@ -80,7 +83,7 @@ export default function TopicList({ topics }: TopicListProps) {
                 <h4>Papers in this topic:</h4>
                 {topic.papers.length > 0 && topic.papers[0].path && (
                   <div className="folder-path">
-                    📁 Folder: {topic.papers[0].path.substring(0, topic.papers[0].path.lastIndexOf('/'))}
+                    📁 Folder: {topic.papers[0].path.substring(0, lastSeparator(topic.papers[0].path))}
                   </div>
                 )}
                 <div className="papers-list">
@@ -96,7 +99,7 @@ export default function TopicList({ topics }: TopicListProps) {
                         )}
                         {paper.path && (
                           <div className="paper-filename">
-                            📄 {paper.path.substring(paper.path.lastIndexOf('/') + 1)}
+                            📄 {paper.path.substring(lastSeparator(paper.path) + 1)}
                           </div>
                         )}
                       </div>

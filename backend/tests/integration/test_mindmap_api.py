@@ -20,7 +20,9 @@ class TestMindMapAPI:
                 "include_results": True
             }
         )
-        assert response.status_code == 422  # Validation error
+        # The endpoint validates this itself and returns 400 with an explanatory message
+        assert response.status_code == 400
+        assert "paper_id or paper_title" in response.json()["detail"]
 
     async def test_generate_mindmap_paper_not_found(self, client: AsyncClient):
         """Test mindmap generation for non-existent paper"""
@@ -145,7 +147,7 @@ class TestMindMapValidation:
             json={
                 "paper_title": "Test",
                 "abstract": "Test abstract with sufficient length for validation testing purposes.",
-                "include_methodology": "yes",  # Should be boolean
+                "include_methodology": "maybe",  # Not coercible to bool (pydantic v2 accepts "yes")
                 "include_results": True
             }
         )

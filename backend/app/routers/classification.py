@@ -31,21 +31,18 @@ async def classify_papers(request: ClassificationRequest):
     start_time = time.time()
 
     try:
-        db = DatabaseManager()
-        await db.initialize()
-
         # Get papers to classify
-        if request.paper_ids:
-            papers = []
-            for paper_id in request.paper_ids:
-                paper = await db.get_paper(paper_id)
-                if paper:
-                    papers.append(paper)
-        else:
-            papers = await db.get_all_papers(limit=10000)
+        async with DatabaseManager() as db:
+            if request.paper_ids:
+                papers = []
+                for paper_id in request.paper_ids:
+                    paper = await db.get_paper(paper_id)
+                    if paper:
+                        papers.append(paper)
+            else:
+                papers = await db.get_all_papers(limit=10000)
 
         if not papers:
-            await db.close()
             raise HTTPException(status_code=400, detail="No papers found to classify")
 
         # TODO: Implement actual classification using enhanced_classifier
@@ -69,8 +66,6 @@ async def classify_papers(request: ClassificationRequest):
                 "Natural Language Processing": [p['id'] for p in papers[2::3]]
             }
 
-        await db.close()
-
         processing_time = time.time() - start_time
 
         return {
@@ -79,6 +74,9 @@ async def classify_papers(request: ClassificationRequest):
             'cached': False
         }
 
+    except HTTPException:
+        # Deliberate 4xx/5xx responses raised above must not be turned into 500s
+        raise
     except Exception as e:
         logger.error(f"Classification error: {e}")
         raise HTTPException(status_code=500, detail=str(e))

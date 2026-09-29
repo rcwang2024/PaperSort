@@ -13,7 +13,6 @@ import json
 
 import fitz  # PyMuPDF
 import PyPDF2
-import pdfplumber
 import re
 
 logger = logging.getLogger(__name__)

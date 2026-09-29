@@ -337,8 +337,9 @@ class EnhancedBibTeXExporter:
 
         # Handle Unicode
         unicode_map = {
-            '"': "''", '"': '``', ''': "'", ''': "`",
-            '–': '--', '—': '---', '…': '\\ldots'
+            '\u201c': '``', '\u201d': "''",   # curly double quotes
+            '\u2018': '`', '\u2019': "'",     # curly single quotes
+            '\u2013': '--', '\u2014': '---', '\u2026': '\\ldots'
         }
 
         for unicode_char, latex in unicode_map.items():

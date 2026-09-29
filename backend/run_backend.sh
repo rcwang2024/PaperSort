@@ -111,7 +111,9 @@ fi
 # Check if required packages are installed
 echo ""
 echo "Checking dependencies..."
-$PYTHON_CMD -c "import fastapi, uvicorn" 2>/dev/null
+# Check every package the backend imports, not just the web server -- a partial
+# install (e.g. from the dependency checker) must still trigger requirements.txt
+$PYTHON_CMD -c "import fastapi, uvicorn, multipart, aiohttp, aiosqlite, fitz, PyPDF2, sklearn, nltk, numpy, graphviz" 2>/dev/null
 DEPS_CHECK=$?
 
 if [ $DEPS_CHECK -ne 0 ]; then
@@ -171,4 +173,6 @@ echo "========================================="
 echo ""
 
 cd "$SCRIPT_DIR"
-exec $PYTHON_CMD -m uvicorn app.main:app --host 0.0.0.0 --port 8000
+# Bind to localhost only: the API can read and move files by path, so it must
+# never be reachable from other machines on the network
+exec $PYTHON_CMD -m uvicorn app.main:app --host 127.0.0.1 --port 8000

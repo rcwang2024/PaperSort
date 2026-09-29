@@ -6,6 +6,16 @@ import pytest
 from app.database.db import DatabaseManager
 
 
+@pytest.fixture
+def make_pdf(tmp_path):
+    """Create a small file with unique content; add_paper hashes the file (file_hash is UNIQUE)."""
+    def _make(name: str):
+        path = tmp_path / name
+        path.write_bytes(b"%PDF-1.4 test file " + name.encode())
+        return path
+    return _make
+
+
 @pytest.mark.unit
 class TestDatabaseManager:
     """Test suite for database manager"""
@@ -17,7 +27,7 @@ class TestDatabaseManager:
         assert db.connection is not None
         await db.close()
 
-    async def test_add_and_get_paper(self, mock_paper_metadata):
+    async def test_add_and_get_paper(self, mock_paper_metadata, make_pdf):
         """Test adding and retrieving a paper"""
         db = DatabaseManager(db_path=":memory:")
         await db.initialize()
@@ -25,7 +35,7 @@ class TestDatabaseManager:
         # Add paper
         paper_id = await db.add_paper(
             metadata=mock_paper_metadata,
-            file_path="/fake/path/paper.pdf",
+            file_path=make_pdf("paper.pdf"),
             full_text="Test full text content"
         )
 
@@ -50,7 +60,7 @@ class TestDatabaseManager:
 
         await db.close()
 
-    async def test_update_paper(self, mock_paper_metadata):
+    async def test_update_paper(self, mock_paper_metadata, make_pdf):
         """Test updating paper metadata"""
         db = DatabaseManager(db_path=":memory:")
         await db.initialize()
@@ -58,7 +68,7 @@ class TestDatabaseManager:
         # Add paper
         paper_id = await db.add_paper(
             metadata=mock_paper_metadata,
-            file_path="/fake/path/paper.pdf"
+            file_path=make_pdf("paper.pdf")
         )
 
         # Update paper
@@ -70,7 +80,7 @@ class TestDatabaseManager:
 
         await db.close()
 
-    async def test_delete_paper(self, mock_paper_metadata):
+    async def test_delete_paper(self, mock_paper_metadata, make_pdf):
         """Test deleting a paper"""
         db = DatabaseManager(db_path=":memory:")
         await db.initialize()
@@ -78,7 +88,7 @@ class TestDatabaseManager:
         # Add paper
         paper_id = await db.add_paper(
             metadata=mock_paper_metadata,
-            file_path="/fake/path/paper.pdf"
+            file_path=make_pdf("paper.pdf")
         )
 
         # Delete paper
@@ -90,7 +100,7 @@ class TestDatabaseManager:
 
         await db.close()
 
-    async def test_search_papers(self, mock_paper_metadata):
+    async def test_search_papers(self, mock_paper_metadata, make_pdf):
         """Test paper search functionality"""
         db = DatabaseManager(db_path=":memory:")
         await db.initialize()
@@ -98,14 +108,14 @@ class TestDatabaseManager:
         # Add multiple papers
         await db.add_paper(
             metadata=mock_paper_metadata,
-            file_path="/fake/path/paper1.pdf"
+            file_path=make_pdf("paper1.pdf")
         )
 
         metadata2 = mock_paper_metadata.copy()
         metadata2["title"] = "Different Topic: Computer Vision"
         await db.add_paper(
             metadata=metadata2,
-            file_path="/fake/path/paper2.pdf"
+            file_path=make_pdf("paper2.pdf")
         )
 
         # Search
@@ -114,7 +124,7 @@ class TestDatabaseManager:
 
         await db.close()
 
-    async def test_get_statistics(self, mock_paper_metadata):
+    async def test_get_statistics(self, mock_paper_metadata, make_pdf):
         """Test getting database statistics"""
         db = DatabaseManager(db_path=":memory:")
         await db.initialize()
@@ -122,7 +132,7 @@ class TestDatabaseManager:
         # Add paper
         await db.add_paper(
             metadata=mock_paper_metadata,
-            file_path="/fake/path/paper.pdf"
+            file_path=make_pdf("paper.pdf")
         )
 
         # Get stats
@@ -132,7 +142,7 @@ class TestDatabaseManager:
 
         await db.close()
 
-    async def test_get_all_papers_pagination(self, mock_paper_metadata):
+    async def test_get_all_papers_pagination(self, mock_paper_metadata, make_pdf):
         """Test pagination when getting all papers"""
         db = DatabaseManager(db_path=":memory:")
         await db.initialize()
@@ -143,7 +153,7 @@ class TestDatabaseManager:
             metadata["title"] = f"Paper {i+1}"
             await db.add_paper(
                 metadata=metadata,
-                file_path=f"/fake/path/paper{i+1}.pdf"
+                file_path=make_pdf(f"paper{i+1}.pdf")
             )
 
         # Test pagination
